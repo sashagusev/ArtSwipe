@@ -63,6 +63,81 @@ header {
 }
 .hdr-liked-link:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
 
+.hdr-io { display: flex; gap: 0.5rem; align-items: center; }
+.hdr-io-btn {
+  font-size: 0.62rem; letter-spacing: .04em;
+  padding: 0.25rem 0.65rem;
+  border: 1px solid var(--rule); border-radius: 4px;
+  background: transparent; color: var(--ghost);
+  cursor: pointer; font-family: var(--sans);
+  text-decoration: none; display: inline-block;
+}
+.hdr-io-btn:hover { color: var(--ink); border-color: #bbb; }
+
+/* ── MOBILE LAYOUT ── */
+@media (max-width: 768px) {
+  .hdr-stats { display: none; }
+  .hdr-io { gap: 0.35rem; }
+
+  /* Hide side panels, let painting area fill full width */
+  .side-left  { display: none !important; }
+  .side-right { display: none !important; }
+
+  /* Painting fills full area */
+  .painting-card img {
+    max-width: 100% !important;
+    max-height: 100% !important;
+  }
+
+  /* Meta overlay — top-left corner, floats over image */
+  .mobile-overlay-meta {
+    display: flex !important;
+    position: absolute !important;
+    top: 0; left: 0;
+  }
+
+  /* Buttons overlay — bottom center, floats over image */
+  .mobile-overlay-btns {
+    display: flex !important;
+    position: absolute !important;
+  }
+}
+
+/* Overlay elements — hidden on desktop, shown on mobile */
+.mobile-overlay-meta {
+  display: none;
+  position: absolute;
+  top: 0; left: 0;
+  z-index: 10;
+  padding: 0.85rem 1rem;
+  background: linear-gradient(to bottom, rgba(255,255,255,0.88) 0%, rgba(255,255,255,0) 100%);
+  width: 75%;
+  pointer-events: none;
+}
+.mobile-overlay-meta .artwork-title {
+  font-size: 0.85rem;
+  pointer-events: auto;
+}
+.mobile-overlay-meta .artwork-byline {
+  font-size: 0.62rem;
+  pointer-events: auto;
+}
+.mobile-overlay-meta .artwork-tags { display: none; }
+
+.mobile-overlay-btns {
+  display: none;
+  position: absolute;
+  bottom: 1.5rem; left: 0; right: 0;
+  z-index: 10;
+  justify-content: center;
+  gap: 1.4rem;
+}
+.mobile-overlay-btns .action-btn {
+  width: 52px; height: 52px;
+  background: rgba(255,255,255,0.9);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+}
+
 /* ── SWIPE SECTION ── */
 .swipe-section {
   height: calc(100svh - 49px);
@@ -420,7 +495,7 @@ kbd {
 }
 .gallery-grid {
   columns: 5 180px;
-  column-gap: 1.8rem;
+  column-gap: 2.8rem;
 }
 .gallery-item {
   break-inside: avoid;
@@ -488,6 +563,10 @@ kbd {
     &nbsp;·&nbsp;
     <span id="h-acc">—</span>&nbsp;acc
   </div>
+  <div class="hdr-io">
+    <button class="hdr-io-btn" id="btn-export" title="Export model &amp; history">Export</button>
+    <label class="hdr-io-btn" id="btn-import-label" title="Import model &amp; history">Import<input type="file" id="import-file" accept=".json" style="display:none"></label>
+  </div>
 </header>
 
 <!-- Swipe section -->
@@ -507,6 +586,13 @@ kbd {
   <div class="painting-area" id="painting-area">
     <div class="swipe-ind ind-like" id="ind-like">like</div>
     <div class="swipe-ind ind-nope" id="ind-nope">pass</div>
+    <!-- Mobile overlays (hidden on desktop) -->
+    <div class="mobile-overlay-meta" id="mobile-meta"></div>
+    <div class="mobile-overlay-btns" id="mobile-btns">
+      <button class="action-btn btn-nope" id="mob-nope" title="Pass">✕</button>
+      <button class="action-btn btn-skip" id="mob-skip" title="Skip">–</button>
+      <button class="action-btn btn-like" id="mob-like" title="Like">★</button>
+    </div>
   </div>
 
   <!-- Right: match score -->
@@ -783,11 +869,27 @@ let deckIdx     = 0;        // next card to show
 let seenIds     = new Set();
 let isProcessing = false;
 
-// Per-style page counters for pagination
+// Per-style page counters for pagination (legacy sequential tracking, kept for debug mode)
 const stylePages = {};
 
 // Count-based exploration: how many times each fetchable tag has been sampled
 const tagSampleCounts = {};
+
+// Total page counts per style, learned from first API response
+const stylePageCounts = {};
+
+function learnPageCount(style, data) {
+  if (stylePageCounts[style] || !data) return;
+  const total = data.AllPaintingsCount || 0;
+  const size  = data.PageSize || 60;
+  if (total > 0) stylePageCounts[style] = Math.max(1, Math.ceil(total / size));
+}
+
+function randomPageFor(style) {
+  const total = stylePageCounts[style];
+  if (!total) return 1; // unknown — fetch page 1 to learn the count
+  return Math.floor(Math.random() * total) + 1;
+}
 
 /// Debug mode: lock deck to a single genre or style so model can learn it clearly
 let debugGenre = null;   // null = normal mode; string = slug
@@ -973,11 +1075,11 @@ async function refillDeck() {
   lastSrc = stylesToFetch.join(', ');
 
   for (const style of stylesToFetch) {
-    const page = (stylePages[style] || 0) + 1;
-    stylePages[style] = page;
+    const page = randomPageFor(style);
     tagSampleCounts[style] = (tagSampleCounts[style] || 0) + 1;
     try {
       const data = await fetchStylePage(style, page);
+      learnPageCount(style, data);
       const fresh = (data.Paintings || [])
         .filter(p => p.id && !seenIds.has(p.id))
         .map(p => { seenIds.add(p.id); return makeArtwork(p, style); });
@@ -1012,6 +1114,18 @@ function buildCard(artwork) {
   img.alt = artwork.title;
   img.loading = 'eager';
   img.onerror = () => el.classList.add('err');
+
+  if (img.complete && img.naturalWidth > 0) {
+    // Already in browser cache — show immediately, no transition needed
+  } else {
+    // Not yet loaded — start invisible and fade in when ready
+    img.style.opacity = '0';
+    img.onload = () => {
+      img.style.transition = 'opacity 0.35s ease';
+      img.style.opacity = '1';
+    };
+  }
+
   el.appendChild(img);
 
   return el;
@@ -1054,6 +1168,14 @@ function renderLeftPanel(artwork) {
 
   // Insert meta before buttons
   panel.insertBefore(meta, btns);
+
+  // Mirror title + byline into the mobile overlay
+  const mob = document.getElementById('mobile-meta');
+  if (mob) {
+    mob.innerHTML = '';
+    mob.appendChild(titleLink.cloneNode(true));
+    mob.appendChild(bylineLink.cloneNode(true));
+  }
 }
 
 function renderTags(container, artwork) {
@@ -1327,11 +1449,11 @@ async function restartDeck() {
     Object.keys(stylePages).forEach(k => delete stylePages[k]);
     lastSrc = '—';
 
-    const seedStyles = FETCH_STYLES.slice(0, 8);
+    const seedStyles = [...FETCH_STYLES].sort(() => Math.random() - 0.5).slice(0, 8);
     const fetches = seedStyles.map(async style => {
-      stylePages[style] = 1;
       try {
         const data  = await fetchStylePage(style, 1);
+        learnPageCount(style, data);
         const fresh = (data.Paintings || [])
           .filter(p => p.id && !seenIds.has(p.id))
           .map(p => { seenIds.add(p.id); return makeArtwork(p, style); });
@@ -2059,17 +2181,20 @@ async function init() {
       `[${VOCAB_SIZE} → 16 → 1]  MSE / Adam 0.01`;
 
     const resumed = await loadState();
-    if (resumed) setStatus(`Resumed — ${trainingSteps} training steps loaded`);
+    if (resumed) { updateHeaderStats(); setStatus(`Resumed — ${trainingSteps} training steps loaded`); }
 
-    // Fetch initial seed styles in parallel (first page each)
+    // Fetch initial seed styles in parallel — shuffle FETCH_STYLES so each
+    // session starts with a different mix, then fetch page 1 to learn total
+    // page counts (used for random page selection on all future fetches).
     setStatus('Fetching artworks from WikiArt…');
-    const seedStyles = FETCH_STYLES.slice(0, 8);
+    const shuffled = [...FETCH_STYLES].sort(() => Math.random() - 0.5);
+    const seedStyles = shuffled.slice(0, 8);
     lastSrc = seedStyles.join(', ');
 
     const fetches = seedStyles.map(async style => {
-      stylePages[style] = 1;
       try {
         const data  = await fetchStylePage(style, 1);
+        learnPageCount(style, data); // cache total pages for random selection later
         const fresh = (data.Paintings || [])
           .filter(p => p.id && !seenIds.has(p.id))
           .map(p => { seenIds.add(p.id); return makeArtwork(p, style); });
@@ -2196,11 +2321,11 @@ function deactivateDebug() {
   area.querySelectorAll('.painting-card').forEach(c => c.remove());
   area.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#aaa;font-size:0.75rem;letter-spacing:.1em">Loading…</div>';
 
-  const seedStyles = FETCH_STYLES.slice(0, 8);
+  const seedStyles = [...FETCH_STYLES].sort(() => Math.random() - 0.5).slice(0, 8);
   const fetches = seedStyles.map(async style => {
-    stylePages[style] = 1;
     try {
       const data  = await fetchStylePage(style, 1);
+      learnPageCount(style, data);
       const fresh = (data.Paintings || [])
         .filter(p => p.id && !seenIds.has(p.id))
         .map(p => { seenIds.add(p.id); return makeArtwork(p, style); });
@@ -2226,6 +2351,77 @@ function setupDebugListeners() {
   document.getElementById('nav-swipe').addEventListener('click', e => {
     e.preventDefault();
     showView('swipe');
+  });
+
+  // Mobile overlay buttons — mirror desktop button behaviour
+  document.getElementById('mob-nope').onclick = () => {
+    const c = document.querySelector('.painting-card'); if (c) flyCard(c, 'left');
+  };
+  document.getElementById('mob-skip').onclick = skipFront;
+  document.getElementById('mob-like').onclick = () => {
+    const c = document.querySelector('.painting-card'); if (c) flyCard(c, 'right');
+  };
+
+  // Export: serialise full state to a downloadable JSON file
+  document.getElementById('btn-export').addEventListener('click', async () => {
+    if (!model) return;
+    const weights = model.getWeights().map(w => Array.from(w.dataSync()));
+    const state = {
+      weights,
+      trainingSteps, nLiked, nPassed, nSkipped,
+      likedScores, passedScores,
+      predictionHistory, rewardHistory, weightSnapshots,
+      tagSampleCounts: { ...tagSampleCounts },
+      lastτ,
+      likedArtworks,
+    };
+    const blob = new Blob([JSON.stringify(state)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `artswipe-${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  // Import: read a previously exported JSON file and restore state
+  document.getElementById('import-file').addEventListener('change', async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const state = JSON.parse(text);
+      if (!state.weights || state.weights.length !== model.getWeights().length) {
+        alert('Incompatible file — wrong model architecture.'); return;
+      }
+      const tensors = state.weights.map((w, i) => {
+        const shape = model.getWeights()[i].shape;
+        return tf.tensor(w, shape);
+      });
+      model.setWeights(tensors);
+      tensors.forEach(t => t.dispose());
+
+      trainingSteps     = state.trainingSteps     || 0;
+      nLiked            = state.nLiked            || 0;
+      nPassed           = state.nPassed           || 0;
+      nSkipped          = state.nSkipped          || 0;
+      likedScores       = state.likedScores       || [];
+      passedScores      = state.passedScores      || [];
+      predictionHistory = state.predictionHistory || [];
+      rewardHistory     = state.rewardHistory     || [];
+      weightSnapshots   = state.weightSnapshots   || [];
+      lastτ             = state.lastτ             ?? τ_MAX;
+      likedArtworks     = state.likedArtworks     || [];
+      Object.keys(tagSampleCounts).forEach(k => delete tagSampleCounts[k]);
+      Object.assign(tagSampleCounts, state.tagSampleCounts || {});
+
+      updateDashboard();
+      updateHeaderStats();
+      saveState();
+      alert(`Imported ${trainingSteps} training steps.`);
+    } catch (err) {
+      alert('Failed to import: ' + err.message);
+    }
+    e.target.value = '';
   });
 
   document.getElementById('debug-toggle').addEventListener('click', () => {
