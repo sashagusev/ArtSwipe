@@ -1115,14 +1115,14 @@ function buildCard(artwork) {
   img.loading = 'eager';
   img.onerror = () => el.classList.add('err');
 
-  if (img.complete && img.naturalWidth > 0) {
-    // Already in browser cache — show immediately, no transition needed
-  } else {
-    // Not yet loaded — start invisible and fade in when ready
-    img.style.opacity = '0';
+  if (!(img.complete && img.naturalWidth > 0)) {
+    // Not yet loaded — hide, then scale+fade up when ready
+    img.style.opacity   = '0';
+    img.style.transform = 'scale(0.88)';
     img.onload = () => {
-      img.style.transition = 'opacity 0.35s ease';
-      img.style.opacity = '1';
+      img.style.transition = 'opacity 0.3s ease, transform 0.35s cubic-bezier(.34,1.2,.64,1)';
+      img.style.opacity    = '1';
+      img.style.transform  = 'scale(1)';
     };
   }
 
@@ -1250,24 +1250,18 @@ function renderStack() {
   renderLeftPanel(remaining[0]);
   updatePred(getPrediction(remaining[0]));
 
-  if (slideIn) {
-    // Slide in from top (below header), then settle in place
-    card.style.transform = 'translateY(-100%)';
-    area.appendChild(card);
-    setupDrag(card);
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      card.style.transition = 'transform 0.48s cubic-bezier(.32,.72,0,1)';
-      card.style.transform  = 'translateY(0)';
-      setTimeout(() => {
-        card.style.removeProperty('transition');
-        card.style.removeProperty('transform');
-      }, 500);
-    }));
-    slideIn = false;
-  } else {
-    area.appendChild(card);
-    setupDrag(card);
-  }
+  // Always slide in from above — force reflow so initial position is committed
+  card.style.transform = 'translateY(-110%)';
+  area.appendChild(card);
+  setupDrag(card);
+  card.getBoundingClientRect(); // force synchronous reflow
+  card.style.transition = 'transform 0.48s cubic-bezier(.32,.72,0,1)';
+  card.style.transform  = 'translateY(0)';
+  setTimeout(() => {
+    card.style.removeProperty('transition');
+    card.style.removeProperty('transform');
+  }, 500);
+  slideIn = false;
 
   // Enrich in background, then refresh tags
   preEnrich(4).then(() => {
