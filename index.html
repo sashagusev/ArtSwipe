@@ -1,0 +1,2326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ArtSwipe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;1,400&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.21.0/dist/tf.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --serif: 'Playfair Display', Georgia, serif;
+  --sans:  'Inter', system-ui, sans-serif;
+  --ink:   #1a1a1a;
+  --dim:   #666;
+  --ghost: #aaa;
+  --rule:  #e2e2e2;
+  --off:   #f7f7f7;
+}
+
+html { scroll-behavior: smooth; }
+body { font-family: var(--sans); background: #fff; color: var(--ink); min-height: 100vh; overflow-x: hidden; }
+
+/* ── LOADING ── */
+#loading {
+  position: fixed; inset: 0; background: #fff;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 1.4rem; z-index: 300; transition: opacity 0.5s ease;
+}
+#loading.out { opacity: 0; pointer-events: none; }
+.ld-title { font-family: var(--serif); font-size: 1.6rem; font-weight: 400; font-style: italic; }
+.ld-dots  { display: flex; gap: 6px; }
+.ld-dot   { width: 6px; height: 6px; border-radius: 50%; background: #ccc; animation: dp 1.3s ease-in-out infinite; }
+.ld-dot:nth-child(2) { animation-delay: .18s; }
+.ld-dot:nth-child(3) { animation-delay: .36s; }
+@keyframes dp { 0%,80%,100%{transform:scale(.75);opacity:.35} 40%{transform:scale(1.1);opacity:1} }
+#ld-status { font-size: 0.62rem; letter-spacing: .14em; text-transform: uppercase; color: var(--ghost); }
+
+/* ── HEADER ── */
+header {
+  position: sticky; top: 0; z-index: 50;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.85rem 1.5rem;
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--rule);
+}
+.logo {
+  font-family: var(--serif); font-weight: 400; font-style: italic;
+  font-size: 1rem; letter-spacing: .01em; color: var(--ink);
+  text-decoration: none;
+}
+.hdr-stats {
+  font-size: 0.7rem; color: var(--ghost); letter-spacing: .03em;
+  display: flex; gap: 1.4rem;
+}
+.hdr-stats span { color: var(--ink); font-weight: 500; }
+.hdr-liked-link {
+  color: var(--ghost); text-decoration: none;
+}
+.hdr-liked-link:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+
+/* ── SWIPE SECTION ── */
+.swipe-section {
+  height: calc(100svh - 49px);
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+}
+
+/* ── LEFT PANEL (meta + buttons) ── */
+.side-left {
+  width: 200px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2rem;
+  padding: 2rem 1.5rem 2rem 2rem;
+}
+
+/* ── PAINTING AREA (fills remaining space) ── */
+.painting-area {
+  flex: 1;
+  position: relative;
+  overflow: hidden;
+  background: #fff;
+}
+
+/* Each painting card fills the area absolutely */
+.painting-card {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: grab;
+  user-select: none;
+  will-change: transform;
+}
+.painting-card:active { cursor: grabbing; }
+
+.painting-card img {
+  display: block;
+  max-width: 90%;
+  max-height: 90%;
+  object-fit: contain;
+  pointer-events: none;
+  outline: 20px solid #F3E1D4;
+}
+.painting-card.err img { display: none; }
+.painting-card.err::after {
+  content: attr(data-artist);
+  display: flex; align-items: center; justify-content: center;
+  width: 320px; height: 240px;
+  font-size: 0.65rem; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--ghost); background: var(--off);
+}
+
+/* ── RIGHT PANEL (match score) ── */
+.side-right {
+  width: 120px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding: 1.5rem 1.5rem 2rem 1rem;
+}
+
+/* ── ARTWORK META (left side panel) ── */
+.artwork-meta { /* no padding needed — side-panel handles spacing */ }
+.artwork-title {
+  display: block;
+  font-family: var(--serif); font-size: 1rem;
+  font-weight: 400; font-style: italic; line-height: 1.4;
+  color: var(--ink); text-decoration: none;
+}
+.artwork-title:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+.artwork-byline {
+  display: block; margin-top: 0.35rem;
+  font-size: 0.7rem; color: var(--dim);
+  text-decoration: none; line-height: 1.5;
+}
+.artwork-byline:hover { color: var(--ink); }
+
+.artwork-tags {
+  display: flex; flex-wrap: wrap; justify-content: flex-start;
+  gap: 0.25rem; margin-top: 0.8rem;
+}
+.tag {
+  font-size: 0.55rem; letter-spacing: .05em;
+  padding: 0.18rem 0.55rem;
+  border: 1px solid var(--rule); border-radius: 50px;
+  color: var(--ghost); background: #fff;
+  white-space: nowrap;
+}
+.tag.loading-tag { background: var(--off); color: transparent; width: 60px; animation: shimmer 1.2s infinite; }
+@keyframes shimmer { 0%,100%{opacity:.4} 50%{opacity:.9} }
+
+/* ── SWIPE INDICATORS ── */
+.swipe-ind {
+  position: absolute; top: 24px;
+  font-family: var(--serif); font-size: 1.3rem; font-style: italic;
+  border: 2px solid; border-radius: 4px;
+  padding: 0.2rem 0.65rem;
+  opacity: 0; z-index: 20; pointer-events: none;
+  transition: opacity 0.06s;
+}
+.ind-like { right: 16px; color: #2a2a2a; border-color: #2a2a2a; transform: rotate(-12deg); }
+.ind-nope { left: 16px;  color: #888;    border-color: #888;    transform: rotate(12deg); }
+
+/* ── PREDICTION (top-right panel) ── */
+.pred-wrap { text-align: left; }
+.pred-label {
+  font-size: 0.48rem; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--ghost); margin-bottom: .3rem;
+}
+.pred-score {
+  font-family: var(--serif); font-size: 1.1rem;
+  font-weight: 400; line-height: 1; color: var(--ink);
+}
+.pred-track {
+  width: 100%; height: 1.5px; background: var(--rule);
+  margin-top: 0.5rem; overflow: hidden;
+}
+.pred-fill { height: 100%; background: var(--ink); transition: width 0.5s ease; }
+
+/* ── ACTION BUTTONS ── */
+.action-btns { display: flex; align-items: center; gap: 0.75rem; }
+.action-btn {
+  width: 44px; height: 44px;
+  border-radius: 50%; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: transform 0.12s ease;
+  background: #fff; border: 1.5px solid var(--rule);
+  color: var(--ghost); font-size: 1rem;
+  flex-shrink: 0;
+}
+.action-btn:hover  { transform: scale(1.08); }
+.action-btn:active { transform: scale(0.92); }
+.action-btn:disabled { opacity: .35; cursor: default; transform: none; }
+.btn-like { color: var(--ink); }
+
+/* ── SCROLL CUE ── */
+.scroll-cue {
+  font-size: 0.58rem; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--ghost);
+  padding-top: 0.5rem; text-align: center;
+  animation: fadebob 3s ease-in-out infinite;
+}
+@keyframes fadebob {
+  0%,100%{opacity:.4;transform:translateY(0)}
+  50%{opacity:.8;transform:translateY(5px)}
+}
+
+/* ── DEBUG PANEL ── */
+#debug-toggle {
+  position: fixed; bottom: 1.2rem; right: 1.2rem;
+  width: 36px; height: 36px; border-radius: 50%;
+  background: #f0f0f0; border: 1px solid #ddd;
+  cursor: pointer; font-size: 1rem; z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+  color: #888; transition: background 0.15s;
+}
+#debug-toggle:hover { background: #e4e4e4; }
+#debug-toggle.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
+
+#debug-panel {
+  position: fixed; bottom: 3.8rem; right: 1.2rem;
+  background: #fff; border: 1px solid #e2e2e2;
+  border-radius: 10px; padding: 1rem 1.2rem;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+  z-index: 200; min-width: 200px;
+  display: none; flex-direction: column; gap: 0.7rem;
+}
+#debug-panel.open { display: flex; }
+.debug-label {
+  font-size: 0.52rem; letter-spacing: .2em; text-transform: uppercase;
+  color: #888; margin-bottom: 0.2rem;
+}
+#debug-genre-select {
+  font-size: 0.72rem; padding: 0.35rem 0.5rem;
+  border: 1px solid #e2e2e2; border-radius: 5px;
+  background: #fafafa; color: #1a1a1a; width: 100%;
+}
+#debug-activate {
+  font-size: 0.65rem; padding: 0.4rem 0.8rem;
+  border: none; border-radius: 5px; cursor: pointer;
+  background: #1a1a1a; color: #fff; letter-spacing: .02em;
+}
+#debug-activate:hover { opacity: 0.82; }
+#debug-activate.off { background: #e44; }
+
+#clear-state {
+  font-size: 0.6rem; padding: 0.35rem 0.8rem;
+  border: 1px solid #ddd; border-radius: 5px; cursor: pointer;
+  background: transparent; color: #888; letter-spacing: .02em;
+  margin-top: 0.2rem;
+}
+#clear-state:hover { border-color: #e44; color: #e44; }
+
+.debug-banner {
+  position: fixed; top: 49px; left: 0; right: 0;
+  background: #1a1a1a; color: #ccc;
+  font-size: 0.55rem; letter-spacing: .18em; text-transform: uppercase;
+  text-align: center; padding: 0.3rem; z-index: 100;
+}
+
+/* ── EMPTY STATE ── */
+.empty-state {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 1rem; padding: 4rem 2rem; text-align: center;
+}
+.empty-state p { font-family: var(--serif); font-style: italic; color: var(--dim); }
+.restart-btn {
+  padding: 0.65rem 1.6rem; background: var(--ink); color: #fff;
+  border: none; border-radius: 6px; font-size: 0.78rem;
+  cursor: pointer; font-family: var(--sans); letter-spacing: .02em;
+}
+.restart-btn:hover { opacity: .82; }
+
+/* ═══════════════════════════════════════════════
+   DASHBOARD  —  sans-serif, monochromatic
+═══════════════════════════════════════════════ */
+.dashboard {
+  background: #141414;
+  padding: 4.5rem 1.5rem 6rem;
+  min-height: 100vh;
+}
+.dash-inner { max-width: 900px; margin: 0 auto; }
+
+.dash-eyebrow {
+  font-size: 0.58rem; letter-spacing: .28em;
+  text-transform: uppercase; color: #aaa; margin-bottom: 0.7rem;
+}
+.dash-headline {
+  font-size: 1.5rem; font-weight: 300; color: #f0f0f0;
+  margin-bottom: 0.5rem; letter-spacing: -.01em;
+}
+.dash-sub {
+  font-size: 0.68rem; color: #bbb; line-height: 1.7;
+  margin-bottom: 3rem; max-width: 540px;
+}
+
+/* Grid */
+.dash-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+@media (min-width: 680px) {
+  .dash-grid { grid-template-columns: 260px 1fr; }
+  .weight-card { grid-column: 2; grid-row: 1 / span 2; }
+}
+
+.dash-card {
+  padding: 1.4rem 0;
+}
+.dash-card-label {
+  font-size: 0.52rem; letter-spacing: .22em;
+  text-transform: uppercase; color: #ccc;
+  margin-bottom: 1.2rem;
+}
+
+/* Stat rows */
+.stat-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 0.5rem 0; border-bottom: 1px solid #1e1e1e;
+  font-size: 0.68rem;
+}
+.stat-row:last-child { border-bottom: none; }
+.sk { color: #aaa; }
+.sv { color: #f0f0f0; }
+
+/* Weight chart */
+.weight-chart {
+  display: flex; flex-direction: column; gap: 0.45rem;
+  max-height: 520px; overflow-y: auto;
+  scrollbar-width: thin; scrollbar-color: #2a2a2a transparent;
+}
+.w-row {
+  display: grid;
+  grid-template-columns: 160px 1fr 52px;
+  align-items: center; gap: 0.6rem;
+}
+.w-tag { font-size: 0.6rem; color: #ccc; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.w-track {
+  height: 5px; background: #282828; border-radius: 3px;
+  position: relative; overflow: hidden;
+}
+.w-track::after {
+  content: ''; position: absolute; left: 50%; top: 0;
+  width: 1px; height: 100%; background: #333;
+}
+.w-fill { position: absolute; height: 100%; border-radius: 2px; transition: width 0.5s ease; }
+.w-fill.pos { left: 50%; background: #d8d8d8; }
+.w-fill.neg { right: 50%; background: #3a3a3a; }
+.w-val { font-size: 0.58rem; text-align: right; white-space: nowrap; }
+.w-val.pos { color: #f0f0f0; }
+.w-val.neg { color: #bbb; }
+
+/* Interaction log */
+.log-wrap {
+  max-height: 220px; overflow-y: auto;
+  scrollbar-width: thin; scrollbar-color: #2a2a2a transparent;
+}
+.log-row {
+  display: grid; grid-template-columns: 1fr 52px 40px;
+  align-items: center; gap: 0.5rem;
+  padding: 0.48rem 0; border-bottom: 1px solid #1e1e1e;
+  font-size: 0.62rem;
+}
+.log-row:last-child { border-bottom: none; }
+.log-name  { color: #ccc; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.log-act   { text-align: center; }
+.log-act.like { color: #f0f0f0; }
+.log-act.skip { color: #bbb; }
+.log-act.pass { color: #bbb; }
+.log-rwd   { color: #ddd; text-align: right; }
+
+/* Accuracy chart hint */
+.acc-chart-hint {
+  font-size: 0.52rem; letter-spacing: .14em; text-transform: uppercase;
+  color: #aaa; text-align: right; margin-top: 0.5rem;
+}
+
+/* Key hint */
+.key-hint {
+  margin-top: 2rem; font-size: 0.58rem; color: #bbb; letter-spacing: .05em; line-height: 2.2;
+}
+kbd {
+  display: inline-block; padding: 0.1rem 0.45rem;
+  border: 1px solid #444; border-radius: 3px;
+  background: transparent; color: #bbb;
+  font-family: var(--sans); font-size: 0.55rem;
+}
+
+/* ── LIKED GALLERY ── */
+.gallery-section {
+  min-height: 100vh;
+  background: #fff;
+  padding: 4rem 2rem 6rem;
+  display: none;
+}
+.gallery-section.visible { display: block; }
+.gallery-header {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-bottom: 2.5rem; border-bottom: 1px solid var(--rule); padding-bottom: 1rem;
+}
+.gallery-title {
+  font-family: var(--serif); font-style: italic;
+  font-size: 1.3rem; font-weight: 400; color: var(--ink);
+}
+.gallery-count {
+  font-size: 0.65rem; color: var(--ghost); letter-spacing: .08em;
+}
+.gallery-grid {
+  columns: 5 180px;
+  column-gap: 1.8rem;
+}
+.gallery-item {
+  break-inside: avoid;
+  display: block;
+  margin-bottom: 2.4rem;
+  text-decoration: none;
+}
+.gallery-item:hover .gallery-img-wrap { outline-color: #ccc; }
+.gallery-img-wrap {
+  outline: 8px solid #F3E1D4;
+  line-height: 0;
+}
+.gallery-img-wrap img {
+  width: 100%; height: auto; display: block;
+}
+.gallery-item-title {
+  font-family: var(--serif); font-style: italic;
+  font-size: 0.78rem; color: var(--ink); line-height: 1.35;
+  margin-top: 0.7rem;
+  text-decoration: none;
+}
+.gallery-item-artist {
+  font-size: 0.62rem; color: var(--dim);
+  margin-top: 0.25rem;
+  text-decoration: none;
+}
+.gallery-empty {
+  font-family: var(--serif); font-style: italic;
+  color: var(--ghost); font-size: 1rem; padding: 3rem 0;
+}
+
+/* Chart hover tooltip */
+#chart-tooltip {
+  position: fixed; pointer-events: none; z-index: 500;
+  background: #111; border: 1px solid #2e2e2e;
+  padding: 0.45rem 0.7rem; border-radius: 5px;
+  font-size: 0.6rem; color: #e0e0e0; line-height: 1.85;
+  font-family: var(--sans); letter-spacing: .015em;
+  white-space: nowrap; display: none;
+}
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loading">
+  <div class="ld-title">ArtSwipe</div>
+  <div class="ld-dots">
+    <div class="ld-dot"></div>
+    <div class="ld-dot"></div>
+    <div class="ld-dot"></div>
+  </div>
+  <div id="ld-status">Initializing…</div>
+</div>
+
+<!-- Header -->
+<header>
+  <a class="logo" href="#" id="nav-swipe">ArtSwipe</a>
+  <div class="hdr-stats">
+    <span id="h-liked">0</span>&nbsp;<a href="#" id="nav-gallery" class="hdr-liked-link">liked</a>
+    &nbsp;·&nbsp;
+    <span id="h-passed">0</span>&nbsp;passed
+    &nbsp;·&nbsp;
+    <span id="h-skipped">0</span>&nbsp;skipped
+    &nbsp;·&nbsp;
+    <span id="h-acc">—</span>&nbsp;acc
+  </div>
+</header>
+
+<!-- Swipe section -->
+<section class="swipe-section">
+
+  <!-- Left: title / artist / tags + action buttons -->
+  <div class="side-left" id="left-panel">
+    <!-- artwork meta injected here by renderLeftPanel -->
+    <div class="action-btns">
+      <button class="action-btn btn-nope"  id="btn-nope"  title="Pass [←]">✕</button>
+      <button class="action-btn btn-skip"  id="btn-skip"  title="Skip [Space]">–</button>
+      <button class="action-btn btn-like"  id="btn-like"  title="Like [→]">★</button>
+    </div>
+  </div>
+
+  <!-- Center: full-size painting -->
+  <div class="painting-area" id="painting-area">
+    <div class="swipe-ind ind-like" id="ind-like">like</div>
+    <div class="swipe-ind ind-nope" id="ind-nope">pass</div>
+  </div>
+
+  <!-- Right: match score -->
+  <div class="side-right">
+    <div class="pred-wrap">
+      <div class="pred-label">Match Score</div>
+      <div class="pred-score" id="pred-score">—</div>
+      <div class="pred-track"><div class="pred-fill" id="pred-fill" style="width:0"></div></div>
+    </div>
+  </div>
+
+</section>
+
+<!-- Dashboard -->
+<section class="dashboard">
+  <div class="dash-inner">
+
+    <div class="dash-eyebrow">Neural Network · Interpretability</div>
+    <div class="dash-headline">What the model has learned</div>
+    <div class="dash-sub">
+      Layer-0 weights extracted via <code style="font-size:0.66rem;color:#aaa">model.layers[0].getWeights()[0].dataSync()</code>,
+      averaged across 16 hidden units per tag. Updated after every training step.
+      Deck refills automatically from WikiArt using the highest-weight styles.
+    </div>
+
+    <div class="dash-grid">
+
+      <!-- Stats -->
+      <div class="dash-card">
+        <div class="dash-card-label">Model State</div>
+        <div class="stat-row"><span class="sk">Architecture</span><span class="sv" id="ds-arch">—</span></div>
+        <div class="stat-row"><span class="sk">Training steps</span><span class="sv" id="ds-steps">0</span></div>
+        <div class="stat-row"><span class="sk">Last reward</span><span class="sv" id="ds-reward">—</span></div>
+        <div class="stat-row"><span class="sk">Prediction accuracy</span><span class="sv" id="ds-acc">—</span></div>
+        <div class="stat-row"><span class="sk">Avg liked score</span><span class="sv" id="ds-alik">—</span></div>
+        <div class="stat-row"><span class="sk">Avg passed score</span><span class="sv" id="ds-apas">—</span></div>
+        <div class="stat-row"><span class="sk">Repetition penalty</span><span class="sv" id="ds-pen">—</span></div>
+        <div class="stat-row"><span class="sk">Explore temperature τ</span><span class="sv" id="ds-tau">—</span></div>
+        <div class="stat-row"><span class="sk">Deck remaining</span><span class="sv" id="ds-deck">—</span></div>
+        <div class="stat-row"><span class="sk">Last refill source</span><span class="sv" id="ds-src">—</span></div>
+        <div class="stat-row"><span class="sk">Saved state</span><span class="sv" id="ds-saved">—</span></div>
+      </div>
+
+      <!-- Log -->
+      <div class="dash-card">
+        <div class="dash-card-label">Interaction Log</div>
+        <div class="log-wrap" id="log-wrap">
+          <div class="log-row" style="justify-content:center">
+            <span class="log-name" style="text-align:center;color:#333">no interactions yet</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Weight chart -->
+      <div class="dash-card weight-card">
+        <div class="dash-card-label">Layer 0 Weights — Tag Affinities</div>
+        <div class="weight-chart" id="weight-chart"></div>
+      </div>
+
+    </div>
+
+    <!-- Sampling distribution -->
+    <div class="dash-card">
+      <div class="dash-card-label">Sampling Distribution — Exploration Policy</div>
+      <canvas id="sample-chart" style="width:100%;display:block"></canvas>
+      <div class="acc-chart-hint" id="sample-hint">τ = — &nbsp;·&nbsp; high τ = explore &nbsp;·&nbsp; low τ = exploit</div>
+    </div>
+
+    <!-- Bottom charts grid -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:2rem;margin-top:0.5rem">
+
+      <div class="dash-card">
+        <div class="dash-card-label">Prediction Accuracy — Over Time</div>
+        <canvas id="acc-chart" height="140" style="width:100%;display:block"></canvas>
+        <div class="acc-chart-hint">swipe number →</div>
+      </div>
+
+      <div class="dash-card">
+        <div class="dash-card-label">Cumulative Reward — RL Signal</div>
+        <canvas id="reward-chart" height="140" style="width:100%;display:block"></canvas>
+        <div class="acc-chart-hint">swipe number →</div>
+      </div>
+
+    </div>
+
+    <!-- Distribution shift -->
+    <div class="dash-card">
+      <div class="dash-card-label">Policy Evolution — Style Weight Trajectories</div>
+      <canvas id="dist-chart" height="180" style="width:100%;display:block"></canvas>
+      <div class="acc-chart-hint">training step →</div>
+    </div>
+
+    <div class="key-hint">
+      <kbd>←</kbd> pass &nbsp;&nbsp;
+      <kbd>Space</kbd> skip &nbsp;&nbsp;
+      <kbd>→</kbd> like &nbsp;&nbsp;
+      <kbd>Esc</kbd> close detail
+    </div>
+
+  </div>
+</section>
+
+<!-- Liked gallery -->
+<section class="gallery-section" id="gallery-section">
+  <div style="max-width:1100px;margin:0 auto">
+    <div class="gallery-header">
+      <span class="gallery-title">Liked artworks</span>
+      <span class="gallery-count" id="gallery-count">0 works</span>
+    </div>
+    <div class="gallery-grid" id="gallery-grid">
+      <p class="gallery-empty">No liked artworks yet — start swiping.</p>
+    </div>
+  </div>
+</section>
+
+<script>
+'use strict';
+
+/* ═══════════════════════════════════════════════════════════
+   VOCABULARY  —  native WikiArt taxonomy
+═══════════════════════════════════════════════════════════ */
+
+const STYLES = [
+  'impressionism','post-impressionism','realism','romanticism',
+  'baroque','symbolism','expressionism','cubism','surrealism',
+  'abstract-expressionism','pop-art','fauvism','art-nouveau-modern',
+  'minimalism','high-renaissance','neoclassicism','northern-renaissance',
+  'mannerism-late-renaissance','rococo','academicism','pointillism',
+  'futurism','dadaism','suprematism','constructivism','photorealism',
+  'magic-realism','naive-art-primitivism','social-realism',
+  'color-field-painting','pre-raphaelitism','orientalism'
+];
+
+const GENRES = [
+  'portrait','landscape','still-life','religious-painting',
+  'abstract','figurative','genre-painting','cityscape',
+  'nude-painting','animal-painting','flower-painting','history-painting'
+];
+
+const MEDIA = [
+  'oil','watercolor','drawing','engraving',
+  'tempera','fresco','acrylic','pastel','gouache'
+];
+
+// Century buckets derived from completitionYear — not from WikiArt metadata
+const PERIODS = [
+  'century-15','century-16','century-17','century-18',
+  'century-19','century-20','century-21'
+];
+
+const VOCAB      = [...STYLES, ...GENRES, ...MEDIA, ...PERIODS];
+const VOCAB_SIZE = VOCAB.length;
+
+// WikiArt style slugs that exist as paintings-by-style pages
+// (subset of STYLES used for fetching; others come from metadata)
+const FETCH_STYLES = [
+  'impressionism','post-impressionism','surrealism','expressionism',
+  'realism','romanticism','baroque','cubism',
+  'symbolism','abstract-expressionism','pop-art','fauvism',
+  'art-nouveau-modern','neoclassicism','high-renaissance','northern-renaissance',
+  'rococo','academicism','pointillism','futurism','dadaism',
+  'suprematism','constructivism','photorealism','magic-realism',
+  'naive-art-primitivism','social-realism','color-field-painting',
+  'pre-raphaelitism','orientalism'
+];
+
+// WikiArt genre slugs available via /en/paintings-by-genre/{slug}
+const FETCH_GENRES = [
+  'portrait','landscape','still-life','religious-painting',
+  'genre-painting','cityscape','nude-painting',
+  'animal-painting','flower-painting','history-painting'
+];
+
+// Normalize a WikiArt display string to our slug.
+// Only returns the slug if it's an exact match in VOCAB — prevents
+// partial / unrecognised WikiArt strings leaking into the feature vector.
+function slugify(s) {
+  const slug = (s || '').toLowerCase()
+    .replace(/['']/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+  return VOCAB.includes(slug) ? slug : null;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   WIKIART API  (via CORS proxy)
+═══════════════════════════════════════════════════════════ */
+
+const WIKIART = 'https://www.wikiart.org';
+const PROXY   = url => `https://corsproxy.io/?${encodeURIComponent(url)}`;
+
+async function wikiGet(path) {
+  const res = await fetch(PROXY(`${WIKIART}${path}`));
+  if (!res.ok) throw new Error(`WikiArt ${path} → ${res.status}`);
+  return res.json();
+}
+
+// Returns { Paintings: [...], AllPaintingsCount, PageSize } or null
+async function fetchStylePage(style, page = 1) {
+  return wikiGet(`/en/paintings-by-style/${style}?json=2&page=${page}`);
+}
+
+async function fetchGenrePage(genre, page = 1) {
+  return wikiGet(`/en/paintings-by-genre/${genre}?json=2&page=${page}`);
+}
+
+// Returns full painting record with .styles .genres .media arrays, or null
+async function fetchPaintingMeta(id) {
+  try {
+    return await wikiGet(`/en/api/2/painting?id=${id}`);
+  } catch { return null; }
+}
+
+function yearToCentury(raw) {
+  const y = parseInt(raw);
+  if (!y || y < 1400) return null;
+  const c = Math.ceil(y / 100);
+  const slug = `century-${c}`;
+  return PERIODS.includes(slug) ? slug : null;
+}
+
+// Convert raw listing row → our artwork object
+function makeArtwork(raw, fallbackStyle) {
+  const paintingUrl = raw.paintingUrl || '';
+  const artistUrl   = raw.artistUrl   || '';
+  const yearVal     = raw.completitionYear || raw.year || '';
+  const century     = yearToCentury(yearVal);
+  const initTags    = fallbackStyle ? [fallbackStyle] : [];
+  if (century) initTags.push(century);
+  return {
+    id:            raw.id,
+    title:         raw.title   || 'Untitled',
+    artist:        raw.artistName || 'Unknown',
+    year:          yearVal,
+    imageUrl:      (raw.image  || '').replace('!Large.jpg', '!HalfHD.jpg'),
+    sourceUrl:     paintingUrl.startsWith('http') ? paintingUrl : `${WIKIART}${paintingUrl}`,
+    artistUrl:     artistUrl.startsWith('http')   ? artistUrl   : `${WIKIART}${artistUrl}`,
+    tags:          initTags,
+    metaLoaded:    false,
+  };
+}
+
+// Enrich one artwork with full style/genre/media tags
+async function enrichArtwork(artwork) {
+  if (artwork.metaLoaded) return;
+  const meta = await fetchPaintingMeta(artwork.id);
+  artwork.metaLoaded = true;
+  if (!meta) return;
+
+  const tags = new Set();
+  (meta.styles || []).forEach(s => { const sl = slugify(s); if (sl) tags.add(sl); });
+  (meta.genres || []).forEach(g => { const sl = slugify(g); if (sl) tags.add(sl); });
+  (meta.media  || []).forEach(m => { const sl = slugify(m); if (sl) tags.add(sl); });
+
+  // Keep fallback style if nothing matched
+  if (tags.size === 0 && artwork.tags.find(t => STYLES.includes(t))) {
+    tags.add(artwork.tags.find(t => STYLES.includes(t)));
+  }
+
+  // Re-add century tag — derived from year, not WikiArt metadata, so it survives enrichment
+  const century = yearToCentury(artwork.year);
+  if (century) tags.add(century);
+
+  artwork.tags = [...tags];
+}
+
+/* ═══════════════════════════════════════════════════════════
+   APPLICATION STATE
+═══════════════════════════════════════════════════════════ */
+
+let model       = null;
+let deck        = [];       // full artwork queue
+let deckIdx     = 0;        // next card to show
+let seenIds     = new Set();
+let isProcessing = false;
+
+// Per-style page counters for pagination
+const stylePages = {};
+
+// Count-based exploration: how many times each fetchable tag has been sampled
+const tagSampleCounts = {};
+
+/// Debug mode: lock deck to a single genre or style so model can learn it clearly
+let debugGenre = null;   // null = normal mode; string = slug
+let debugType  = 'genre'; // 'genre' | 'style'
+let debugGenrePage = 1;  // pagination for debug fetches
+
+// Stats
+let nLiked = 0, nPassed = 0, nSkipped = 0;
+let likedScores  = [], passedScores = [];
+let likedArtworks = []; // full artwork objects for the gallery
+let predictionHistory = []; // true/false per swipe — was the pre-swipe prediction correct?
+let rewardHistory    = []; // finalReward per swipe (for cumulative reward curve)
+let weightSnapshots  = []; // snapshot of STYLES weights after each training step
+
+
+// Exploration policy
+const τ_MAX   = 2.5;   // initial temperature (near-uniform sampling)
+const τ_MIN   = 0.18;  // floor temperature (sharply exploitative)
+const τ_DECAY = 28;    // steps to half-temperature
+let   lastτ   = τ_MAX;
+let   lastSamplingProbs = []; // [{tag, prob}] at most recent refill
+let trainingSteps = 0, lastReward = null;
+let lastPenalty   = false;
+let lastSrc       = '—';
+
+// Repetition penalty: track style tags of last 3 swiped artworks
+let recentStyleWindows = [];
+
+/* ═══════════════════════════════════════════════════════════
+   TENSORFLOW MODEL
+═══════════════════════════════════════════════════════════ */
+
+async function buildModel() {
+  const m = tf.sequential();
+  m.add(tf.layers.dense({
+    units: 16, activation: 'relu', inputShape: [VOCAB_SIZE],
+    kernelInitializer: 'glorotNormal', biasInitializer: 'zeros'
+  }));
+  m.add(tf.layers.dense({
+    units: 1, activation: 'linear',
+    kernelInitializer: 'glorotNormal', biasInitializer: 'zeros'
+  }));
+  m.compile({ optimizer: tf.train.adam(0.01), loss: 'meanSquaredError' });
+  return m;
+}
+
+function encode(artwork) {
+  const v = new Float32Array(VOCAB_SIZE);
+  artwork.tags.forEach(t => { const i = VOCAB.indexOf(t); if (i >= 0) v[i] = 1; });
+  return v;
+}
+
+function getPrediction(artwork) {
+  return tf.tidy(() => {
+    const x   = tf.tensor2d([Array.from(encode(artwork))], [1, VOCAB_SIZE]);
+    const raw = model.predict(x).dataSync()[0];
+    return 1 / (1 + Math.exp(-raw)); // sigmoid for display
+  });
+}
+
+function getTagWeights() {
+  // Marginal effect of each vocab tag on model output:
+  // run a batched forward pass with the identity matrix (each row = one-hot for one tag)
+  // then subtract the all-zero baseline. This correctly accounts for both layer weights.
+  return tf.tidy(() => {
+    const baseline = model.predict(tf.zeros([1, VOCAB_SIZE])).dataSync()[0];
+    const preds    = model.predict(tf.eye(VOCAB_SIZE)).dataSync(); // shape [VOCAB_SIZE]
+    return VOCAB.map((tag, i) => ({ tag, weight: preds[i] - baseline }));
+  });
+}
+
+async function trainStep(artwork, baseReward) {
+  // Repetition penalty — skipped in debug mode because every card is the same tag by design;
+  // applying it there systematically biases dislikes more than likes and corrupts the signal.
+  const curStyles = artwork.tags.filter(t => STYLES.includes(t));
+  let penalty = false;
+
+  if (!debugGenre && recentStyleWindows.length >= 3) {
+    const recent = recentStyleWindows.slice(-3).flat();
+    if (curStyles.some(s => recent.includes(s))) {
+      baseReward -= 0.5;
+      penalty = true;
+    }
+  }
+  recentStyleWindows.push(curStyles);
+  if (recentStyleWindows.length > 3) recentStyleWindows.shift();
+
+  const xs = tf.tensor2d([Array.from(encode(artwork))], [1, VOCAB_SIZE]);
+  const ys = tf.tensor2d([[baseReward]], [1, 1]);
+  await model.fit(xs, ys, { epochs: 1, verbose: 0 });
+  xs.dispose(); ys.dispose();
+
+  trainingSteps++;
+  lastReward  = baseReward;
+  lastPenalty = penalty;
+  return { finalReward: baseReward, penalty };
+}
+
+/* ═══════════════════════════════════════════════════════════
+   DECK MANAGEMENT & RL REFILL
+═══════════════════════════════════════════════════════════ */
+
+let isRefilling = false;
+
+async function refillDeck() {
+  if (isRefilling) return;
+  const remaining = deck.length - deckIdx;
+  if (remaining > 25) return;
+
+  isRefilling = true;
+
+  // ── Debug mode: fetch 2 pages at a time and shuffle for variety ──
+  if (debugGenre) {
+    lastSrc = `[debug] ${debugGenre}`;
+    const fetchFn = debugType === 'style' ? fetchStylePage : fetchGenrePage;
+    try {
+      const p1 = debugGenrePage++;
+      const p2 = debugGenrePage++;
+      const results = await Promise.allSettled([
+        fetchFn(debugGenre, p1),
+        fetchFn(debugGenre, p2),
+      ]);
+      const fresh = [];
+      results.forEach(r => {
+        if (r.status !== 'fulfilled') return;
+        (r.value.Paintings || [])
+          .filter(p => p.id && !seenIds.has(p.id))
+          .forEach(p => {
+            seenIds.add(p.id);
+            const a = makeArtwork(p, debugGenre); // tags already = [debugGenre, century?]
+            a.metaLoaded = true;
+            fresh.push(a);
+          });
+      });
+      for (let i = fresh.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [fresh[i], fresh[j]] = [fresh[j], fresh[i]];
+      }
+      deck.push(...fresh);
+    } catch (e) {
+      console.warn('debug refill failed', e.message);
+    }
+    isRefilling = false;
+    updateDashboard();
+    return;
+  }
+
+  // Boltzmann sampling with count-based UCB exploration bonus.
+  // Temperature decays from τ_MAX → τ_MIN; tags seen fewer times get an
+  // additive bonus proportional to sqrt(log(totalSamples+1) / (count+1))
+  // so under-explored styles stay in the mix longer.
+  lastτ = Math.max(τ_MIN, τ_MAX * Math.exp(-trainingSteps / τ_DECAY));
+
+  const tagWeights = getTagWeights().filter(w => FETCH_STYLES.includes(w.tag));
+  const totalSamples = Object.values(tagSampleCounts).reduce((a, b) => a + b, 0);
+  const ucbC = 0.5; // exploration bonus scale
+  // Shift so the minimum weight maps to 0 before exponentiation, then add UCB bonus
+  const minW  = Math.min(...tagWeights.map(w => w.weight));
+  const exps  = tagWeights.map(w => {
+    const count = tagSampleCounts[w.tag] || 0;
+    const bonus = ucbC * Math.sqrt(Math.log(totalSamples + 1) / (count + 1));
+    return Math.exp((w.weight - minW + bonus) / lastτ);
+  });
+  const sumE  = exps.reduce((a, b) => a + b, 0);
+  lastSamplingProbs = tagWeights.map((w, i) => ({ tag: w.tag, prob: exps[i] / sumE }));
+
+  // Sample 3 styles without replacement according to softmax probs
+  const stylesToFetch = [];
+  const pool = lastSamplingProbs.map(p => ({ ...p }));
+  for (let i = 0; i < 3 && pool.length > 0; i++) {
+    const total = pool.reduce((s, p) => s + p.prob, 0);
+    let r = Math.random() * total, cum = 0;
+    for (let j = 0; j < pool.length; j++) {
+      cum += pool[j].prob;
+      if (r <= cum || j === pool.length - 1) {
+        stylesToFetch.push(pool[j].tag);
+        pool.splice(j, 1);
+        break;
+      }
+    }
+  }
+
+  lastSrc = stylesToFetch.join(', ');
+
+  for (const style of stylesToFetch) {
+    const page = (stylePages[style] || 0) + 1;
+    stylePages[style] = page;
+    tagSampleCounts[style] = (tagSampleCounts[style] || 0) + 1;
+    try {
+      const data = await fetchStylePage(style, page);
+      const fresh = (data.Paintings || [])
+        .filter(p => p.id && !seenIds.has(p.id))
+        .map(p => { seenIds.add(p.id); return makeArtwork(p, style); });
+      deck.push(...fresh);
+    } catch (e) {
+      console.warn(`refill: ${style} p${page} failed`, e.message);
+    }
+  }
+
+  isRefilling = false;
+  updateDashboard();
+}
+
+// Eagerly enrich the next few cards in background
+async function preEnrich(n = 4) {
+  const slice = deck.slice(deckIdx, deckIdx + n).filter(a => !a.metaLoaded);
+  await Promise.allSettled(slice.map(enrichArtwork));
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CARD RENDERING
+═══════════════════════════════════════════════════════════ */
+
+function buildCard(artwork) {
+  const el = document.createElement('div');
+  el.className = 'painting-card';
+  el.dataset.id = artwork.id;
+  el.dataset.artist = artwork.artist;
+
+  const img = document.createElement('img');
+  img.src = artwork.imageUrl;
+  img.alt = artwork.title;
+  img.loading = 'eager';
+  img.onerror = () => el.classList.add('err');
+  el.appendChild(img);
+
+  return el;
+}
+
+function renderLeftPanel(artwork) {
+  const panel = document.getElementById('left-panel');
+  if (!panel) return;
+
+  // Remove old meta block (preserve the .action-btns which is last child)
+  const btns = panel.querySelector('.action-btns');
+  panel.innerHTML = '';
+  if (btns) panel.appendChild(btns);
+
+  if (!artwork) return;
+
+  const titleLink = document.createElement('a');
+  titleLink.className   = 'artwork-title';
+  titleLink.href        = artwork.sourceUrl;
+  titleLink.target      = '_blank';
+  titleLink.rel         = 'noopener';
+  titleLink.textContent = artwork.title;
+
+  const bylineLink = document.createElement('a');
+  bylineLink.className   = 'artwork-byline';
+  bylineLink.href        = artwork.artistUrl;
+  bylineLink.target      = '_blank';
+  bylineLink.rel         = 'noopener';
+  bylineLink.textContent = artwork.year ? `${artwork.artist}\n${artwork.year}` : artwork.artist;
+
+  const tagsDiv = document.createElement('div');
+  tagsDiv.className = 'artwork-tags';
+  renderTags(tagsDiv, artwork);
+
+  const meta = document.createElement('div');
+  meta.className = 'artwork-meta';
+  meta.appendChild(titleLink);
+  meta.appendChild(bylineLink);
+  meta.appendChild(tagsDiv);
+
+  // Insert meta before buttons
+  panel.insertBefore(meta, btns);
+}
+
+function renderTags(container, artwork) {
+  container.innerHTML = '';
+  if (!artwork.metaLoaded) {
+    for (let i = 0; i < 3; i++) {
+      const s = document.createElement('span');
+      s.className = 'tag loading-tag';
+      s.textContent = '——';
+      container.appendChild(s);
+    }
+    return;
+  }
+
+  // Get marginal weights for all tags on this artwork
+  const weights = getTagWeights();
+  const weightMap = {};
+  weights.forEach(w => weightMap[w.tag] = w.weight);
+  const relevant = artwork.tags.filter(t => t in weightMap);
+  const maxAbs = relevant.length
+    ? Math.max(...relevant.map(t => Math.abs(weightMap[t])), 0.01)
+    : 0.01;
+
+  artwork.tags.slice(0, 7).forEach(t => {
+    const s = document.createElement('span');
+    s.className = 'tag';
+    s.textContent = t;
+    if (t in weightMap && maxAbs > 0.01) {
+      const w = weightMap[t];
+      const intensity = Math.min(Math.abs(w) / maxAbs, 1);
+      if (w > 0.01) {
+        // green tint — positive contribution
+        const g = Math.round(80 + intensity * 120);
+        s.style.borderColor = `rgba(60,${g},60,${0.4 + intensity * 0.5})`;
+        s.style.color = `rgba(100,${g + 30},100,${0.7 + intensity * 0.3})`;
+      } else if (w < -0.01) {
+        // red tint — negative contribution
+        const r = Math.round(120 + intensity * 100);
+        s.style.borderColor = `rgba(${r},50,50,${0.4 + intensity * 0.5})`;
+        s.style.color = `rgba(${r + 20},80,80,${0.7 + intensity * 0.3})`;
+      }
+      s.title = `${w >= 0 ? '+' : ''}${w.toFixed(3)}`;
+    }
+    container.appendChild(s);
+  });
+}
+
+// true after first swipe — controls whether new card slides in from top
+let slideIn = false;
+
+function renderStack() {
+  const area = document.getElementById('painting-area');
+
+  // Remove any existing painting card (leave swipe indicators in place)
+  area.querySelectorAll('.painting-card').forEach(c => c.remove());
+
+  const remaining = deck.slice(deckIdx);
+  if (remaining.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'empty-state';
+    empty.innerHTML = `<p>You've seen everything.</p>
+      <button class="restart-btn" id="restart-btn">Shuffle &amp; restart</button>`;
+    area.appendChild(empty);
+    document.getElementById('restart-btn').onclick = restartDeck;
+    renderLeftPanel(null);
+    updatePred(null);
+    slideIn = false;
+    return;
+  }
+
+  const card = buildCard(remaining[0]);
+  renderLeftPanel(remaining[0]);
+  updatePred(getPrediction(remaining[0]));
+
+  if (slideIn) {
+    // Slide in from top (below header), then settle in place
+    card.style.transform = 'translateY(-100%)';
+    area.appendChild(card);
+    setupDrag(card);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      card.style.transition = 'transform 0.48s cubic-bezier(.32,.72,0,1)';
+      card.style.transform  = 'translateY(0)';
+      setTimeout(() => {
+        card.style.removeProperty('transition');
+        card.style.removeProperty('transform');
+      }, 500);
+    }));
+    slideIn = false;
+  } else {
+    area.appendChild(card);
+    setupDrag(card);
+  }
+
+  // Enrich in background, then refresh tags
+  preEnrich(4).then(() => {
+    const cur = deck[deckIdx];
+    if (cur) renderLeftPanel(cur);
+  });
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   DRAG & SWIPE
+═══════════════════════════════════════════════════════════ */
+
+let drag = null;
+
+function setupDrag(card) {
+  card.addEventListener('mousedown',  onDragStart, { passive: false });
+  card.addEventListener('touchstart', onDragStart, { passive: true });
+}
+
+function onDragStart(e) {
+  if (isProcessing) return;
+  if (e.target.tagName === 'A') return; // links clickable, not swipeable
+  const pt = e.touches ? e.touches[0] : e;
+  drag = { x0: pt.clientX, y0: pt.clientY, card: e.currentTarget };
+  drag.card.style.transition = 'none';
+  document.addEventListener('mousemove',  onDragMove);
+  document.addEventListener('mouseup',    onDragEnd);
+  document.addEventListener('touchmove',  onDragMove, { passive: false });
+  document.addEventListener('touchend',   onDragEnd);
+}
+
+function onDragMove(e) {
+  if (!drag) return;
+  if (e.cancelable) e.preventDefault();
+  const pt = e.touches ? e.touches[0] : e;
+  const dx = pt.clientX - drag.x0;
+  const dy = pt.clientY - drag.y0;
+  drag.card.style.transform = `translateX(${dx}px) translateY(${dy * .22}px) rotateZ(${dx * .06}deg)`;
+
+  const t   = Math.min(Math.abs(dx) / 100, 1);
+  const il  = document.getElementById('ind-like');
+  const inp = document.getElementById('ind-nope');
+  if (dx > 30)       { il.style.opacity = t; inp.style.opacity = 0; }
+  else if (dx < -30) { inp.style.opacity = t; il.style.opacity = 0; }
+  else               { il.style.opacity = 0;  inp.style.opacity = 0; }
+}
+
+function onDragEnd(e) {
+  if (!drag) return;
+  removeDragListeners();
+  const pt = e.changedTouches ? e.changedTouches[0] : e;
+  const dx = pt.clientX - drag.x0;
+  const card = drag.card;
+  drag = null;
+
+  document.getElementById('ind-like').style.opacity = 0;
+  document.getElementById('ind-nope').style.opacity = 0;
+
+  if (Math.abs(dx) > 90) flyCard(card, dx > 0 ? 'right' : 'left');
+  else {
+    card.style.transition = 'transform .55s cubic-bezier(.34,1.56,.64,1)';
+    card.style.transform  = '';
+  }
+}
+
+function removeDragListeners() {
+  document.removeEventListener('mousemove',  onDragMove);
+  document.removeEventListener('mouseup',    onDragEnd);
+  document.removeEventListener('touchmove',  onDragMove);
+  document.removeEventListener('touchend',   onDragEnd);
+}
+
+function flyCard(card, dir) {
+  if (isProcessing) return;
+  const xEnd = dir === 'right' ? window.innerWidth * 1.5 : -window.innerWidth * 1.5;
+  card.style.transition = 'transform .55s cubic-bezier(.25,.46,.45,.94)';
+  card.style.transform  = `translateX(${xEnd}px) rotateZ(${dir === 'right' ? 18 : -18}deg)`;
+  slideIn = true;
+  setTimeout(() => { card.remove(); handleSwipe(dir); }, 560);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   SWIPE LOGIC
+═══════════════════════════════════════════════════════════ */
+
+async function handleSwipe(dir) {
+  if (isProcessing) return;
+  isProcessing = true;
+  setButtons(false);
+
+  const artwork    = deck[deckIdx];
+  const isLike     = dir === 'right';
+  const baseReward = dir === 'skip' ? -0.2 : (isLike ? 1.0 : -1.0);
+
+  // Capture pre-swipe prediction with whatever tags we have now
+  // (card is typically already enriched by preEnrich; fallback = 0.5)
+  const preScore = getPrediction(artwork);
+
+  // ── Advance deck and render the next card immediately ──
+  // This lets the white-card resize animation start right away,
+  // decoupled from the enrichArtwork network round-trip below.
+  deckIdx++;
+  renderStack();
+  refillDeck(); // async, non-blocking
+
+  // ── Now enrich the swiped card's metadata and train ──
+  await enrichArtwork(artwork);
+
+  const { finalReward } = await trainStep(artwork, baseReward);
+
+  const score = getPrediction(artwork);
+  if (isLike)              { nLiked++;   likedScores.push(score); likedArtworks.push(artwork); }
+  else if (dir === 'left') { nPassed++;  passedScores.push(score); }
+  else                     { nSkipped++;                            }
+
+  // Track whether the pre-swipe prediction matched the user's choice
+  predictionHistory.push((preScore > 0.5) === isLike);
+
+  // RL-specific tracking: reward signal + policy (all vocab weight snapshot)
+  rewardHistory.push(finalReward);
+  const snap = {};
+  getTagWeights().forEach(w => snap[w.tag] = w.weight);
+  weightSnapshots.push(snap);
+
+  // Always recompute τ and sampling distribution (styles + genres) so charts stay live
+  lastτ = Math.max(τ_MIN, τ_MAX * Math.exp(-trainingSteps / τ_DECAY));
+  {
+    const pool = getTagWeights().filter(w => FETCH_STYLES.includes(w.tag) || FETCH_GENRES.includes(w.tag));
+    const minW = Math.min(...pool.map(w => w.weight));
+    const exps = pool.map(w => Math.exp((w.weight - minW) / lastτ));
+    const sumE = exps.reduce((a, b) => a + b, 0);
+    lastSamplingProbs = pool.map((w, i) => ({ tag: w.tag, prob: exps[i] / sumE }));
+  }
+
+  addLog(artwork, dir, finalReward);
+
+  updateDashboard();
+  updateHeaderStats();
+
+  // Re-render tags on the new front card with updated weights
+  const nextArtwork = deck[deckIdx];
+  if (nextArtwork) {
+    const tagsDiv = document.querySelector('#left-panel .artwork-tags');
+    if (tagsDiv) renderTags(tagsDiv, nextArtwork);
+  }
+
+  saveState(); // non-blocking, fire and forget
+
+  isProcessing = false;
+  setButtons(true);
+}
+
+function setButtons(on) {
+  document.getElementById('btn-nope').disabled = !on;
+  document.getElementById('btn-skip').disabled = !on;
+  document.getElementById('btn-like').disabled = !on;
+}
+
+async function restartDeck() {
+  // Reset state that could leave the UI stuck
+  isProcessing = false;
+  setButtons(true);
+
+  if (deck.length > 0) {
+    // Normal case: re-shuffle what we already have
+    deckIdx = 0;
+    seenIds.clear();
+    for (let i = deck.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+    renderStack();
+  } else {
+    // Deck never loaded (API failed on init) — try again
+    const stack = document.getElementById('card-stack');
+    stack.innerHTML = `<div class="empty-state"><p style="font-style:normal;font-size:.75rem;color:#aaa">Fetching artworks…</p></div>`;
+    seenIds.clear();
+    Object.keys(stylePages).forEach(k => delete stylePages[k]);
+    lastSrc = '—';
+
+    const seedStyles = FETCH_STYLES.slice(0, 8);
+    const fetches = seedStyles.map(async style => {
+      stylePages[style] = 1;
+      try {
+        const data  = await fetchStylePage(style, 1);
+        const fresh = (data.Paintings || [])
+          .filter(p => p.id && !seenIds.has(p.id))
+          .map(p => { seenIds.add(p.id); return makeArtwork(p, style); });
+        return fresh;
+      } catch { return []; }
+    });
+
+    const batches = await Promise.allSettled(fetches);
+    batches.forEach(r => { if (r.status === 'fulfilled') deck.push(...r.value); });
+
+    for (let i = deck.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+    renderStack();
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   PREDICTION UI
+═══════════════════════════════════════════════════════════ */
+
+function updatePred(score) {
+  const el   = document.getElementById('pred-score');
+  const fill = document.getElementById('pred-fill');
+  if (score == null) {
+    el.textContent  = '—';
+    fill.style.width = '0';
+    return;
+  }
+  el.textContent  = score.toFixed(3);
+  fill.style.width = `${(score * 100).toFixed(1)}%`;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   DASHBOARD
+═══════════════════════════════════════════════════════════ */
+
+function setupChartHover(canvasId, padL, padR, getLen, getLines, renderFn) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas || canvas._hoverAttached) return;
+  canvas._hoverAttached = true;
+  const tip = document.getElementById('chart-tooltip');
+
+  canvas.addEventListener('mousemove', e => {
+    const n = getLen();
+    if (n < 2) return;
+    const rect = canvas.getBoundingClientRect();
+    const W = rect.width - padL - padR;
+    const x = e.clientX - rect.left - padL;
+    const idx = Math.round(Math.max(0, Math.min(1, x / W)) * (n - 1));
+    canvas._hoverIdx = idx;
+    renderFn();
+
+    const lines = getLines(idx);
+    if (lines && lines.length) {
+      tip.innerHTML = lines.join('<br>');
+      tip.style.display = 'block';
+      const tx = e.clientX + 16;
+      const ty = e.clientY - 12;
+      tip.style.left = Math.min(tx, window.innerWidth - 200) + 'px';
+      tip.style.top  = Math.max(4, ty) + 'px';
+    }
+  });
+
+  canvas.addEventListener('mouseleave', () => {
+    canvas._hoverIdx = null;
+    tip.style.display = 'none';
+    renderFn();
+  });
+}
+
+function updateDashboard() {
+  const avg = arr => arr.length ? (arr.reduce((a,b) => a+b, 0) / arr.length) : null;
+
+  document.getElementById('ds-steps').textContent = trainingSteps;
+  document.getElementById('ds-reward').textContent =
+    lastReward != null ? (lastReward >= 0 ? '+' : '') + lastReward.toFixed(2) : '—';
+  const acc = predictionHistory.length
+    ? (predictionHistory.filter(x => x).length / predictionHistory.length * 100).toFixed(1) + '%'
+    : '—';
+  document.getElementById('ds-acc').textContent  = acc;
+  document.getElementById('ds-alik').textContent =
+    avg(likedScores)  != null ? avg(likedScores).toFixed(3)  : '—';
+  document.getElementById('ds-apas').textContent =
+    avg(passedScores) != null ? avg(passedScores).toFixed(3) : '—';
+  document.getElementById('ds-pen').textContent  = lastPenalty ? 'yes  (−0.5)' : 'none';
+  document.getElementById('ds-tau').textContent  = lastτ.toFixed(3);
+  document.getElementById('ds-deck').textContent = deck.length - deckIdx;
+  document.getElementById('ds-src').textContent  = lastSrc;
+  const savedBytes = (localStorage.getItem(LS_KEY) || '').length;
+  document.getElementById('ds-saved').textContent =
+    savedBytes > 0 ? `yes (${(savedBytes / 1024).toFixed(1)} kb)` : 'none';
+
+  renderWeightChart();
+  renderSamplingChart();
+  renderAccuracyChart();
+  renderRewardChart();
+  renderDistChart();
+
+  setupChartHover('acc-chart', 36, 12,
+    () => predictionHistory.length,
+    idx => {
+      const n = predictionHistory.length;
+      if (!n) return null;
+      let correct = 0;
+      for (let i = 0; i <= idx; i++) if (predictionHistory[i]) correct++;
+      const pct = (correct / (idx + 1) * 100).toFixed(1);
+      return [`<span style="color:#666">swipe ${idx + 1} / ${n}</span>`, `accuracy: ${pct}%`];
+    },
+    renderAccuracyChart
+  );
+
+  setupChartHover('reward-chart', 42, 12,
+    () => rewardHistory.length,
+    idx => {
+      if (!rewardHistory.length) return null;
+      let cum = 0;
+      for (let i = 0; i <= idx; i++) cum += rewardHistory[i];
+      const step = rewardHistory[idx];
+      return [
+        `<span style="color:#666">swipe ${idx + 1} / ${rewardHistory.length}</span>`,
+        `reward: ${step >= 0 ? '+' : ''}${step.toFixed(2)}`,
+        `cumulative: ${cum >= 0 ? '+' : ''}${cum.toFixed(2)}`
+      ];
+    },
+    renderRewardChart
+  );
+
+  setupChartHover('dist-chart', 42, 110,
+    () => weightSnapshots.length,
+    idx => {
+      if (!weightSnapshots.length) return null;
+      const snap = weightSnapshots[idx];
+      const last = weightSnapshots[weightSnapshots.length - 1];
+      const topTags = [...VOCAB]
+        .map(s => ({ s, w: Math.abs(last[s] || 0) }))
+        .sort((a, b) => b.w - a.w).slice(0, 6).map(x => x.s);
+      return [
+        `<span style="color:#666">step ${idx + 1} / ${weightSnapshots.length}</span>`,
+        ...topTags.map(t => {
+          const v = snap[t] || 0;
+          return `${t}: ${v >= 0 ? '+' : ''}${v.toFixed(3)}`;
+        })
+      ];
+    },
+    renderDistChart
+  );
+}
+
+function renderSamplingChart() {
+  const canvas = document.getElementById('sample-chart');
+  if (!canvas) return;
+
+  const probs  = lastSamplingProbs.length ? lastSamplingProbs : FETCH_STYLES.map(tag => ({ tag, prob: 1 / FETCH_STYLES.length }));
+  const sorted = [...probs].sort((a, b) => b.prob - a.prob);
+  const maxP   = sorted[0].prob;
+
+  const dpr    = window.devicePixelRatio || 1;
+  const rowH   = 18;
+  const padL   = 130, padR = 44, padT = 6, padB = 6;
+  const cssW   = canvas.offsetWidth || 853;
+  const cssH   = padT + sorted.length * rowH + padB;
+
+  canvas.height = cssH * dpr;
+  canvas.width  = cssW * dpr;
+  canvas.style.height = cssH + 'px';
+
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, cssW, cssH);
+
+  const barW = cssW - padL - padR;
+
+  sorted.forEach(({ tag, prob }, i) => {
+    const y    = padT + i * rowH;
+    const bLen = (prob / maxP) * barW;
+
+    // Uniform reference line (what 1/n looks like)
+    const uniformX = padL + (1 / sorted.length / maxP) * barW;
+    ctx.beginPath();
+    ctx.strokeStyle = '#252525';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([2, 3]);
+    ctx.moveTo(uniformX, padT);
+    ctx.lineTo(uniformX, padT + sorted.length * rowH);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Bar — brighter for higher probability (more exploited)
+    const intensity = 0.28 + 0.52 * (prob / maxP);
+    const gray = Math.round(intensity * 255);
+    ctx.fillStyle = `rgb(${gray},${gray},${gray})`;
+    ctx.fillRect(padL, y + 3, bLen, rowH - 7);
+
+    // Style name
+    ctx.fillStyle = '#bbb';
+    ctx.font = `${9}px Inter, system-ui, sans-serif`;
+    ctx.textAlign = 'right';
+    ctx.fillText(tag, padL - 6, y + rowH - 6);
+
+    // Probability label
+    ctx.fillStyle = '#aaa';
+    ctx.textAlign = 'left';
+    ctx.fillText((prob * 100).toFixed(1) + '%', padL + bLen + 5, y + rowH - 6);
+  });
+
+  // Update hint with current τ and regime label
+  const hint = document.getElementById('sample-hint');
+  if (hint) {
+    const regime = lastτ > 1.2 ? 'exploring' : lastτ > 0.5 ? 'transitioning' : 'exploiting';
+    hint.textContent = `τ = ${lastτ.toFixed(3)}  ·  ${regime}  ·  dashed line = uniform`;
+  }
+}
+
+function renderWeightChart() {
+  const weights = getTagWeights();
+  const maxAbs  = Math.max(...weights.map(w => Math.abs(w.weight)), 1e-6);
+  const sorted  = [...weights].sort((a, b) => Math.abs(b.weight) - Math.abs(a.weight));
+
+  document.getElementById('weight-chart').innerHTML = sorted.map(({ tag, weight }) => {
+    const pct    = Math.min(Math.abs(weight) / maxAbs * 50, 50).toFixed(1);
+    const isPos  = weight >= 0;
+    const fillSt = isPos ? `left:50%;width:${pct}%` : `right:50%;width:${pct}%`;
+    return `<div class="w-row">
+      <span class="w-tag">${tag}</span>
+      <div class="w-track"><div class="w-fill ${isPos?'pos':'neg'}" style="${fillSt}"></div></div>
+      <span class="w-val ${isPos?'pos':'neg'}">${isPos?'+':''}${weight.toFixed(3)}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderAccuracyChart() {
+  const canvas = document.getElementById('acc-chart');
+  if (!canvas) return;
+
+  // Match canvas pixel width to its CSS display width (device pixel ratio aware)
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = canvas.offsetWidth;
+  const cssH = 140;
+  canvas.width  = cssW * dpr;
+  canvas.height = cssH * dpr;
+
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const pad = { top: 10, right: 12, bottom: 10, left: 36 };
+  const W = cssW - pad.left - pad.right;
+  const H = cssH - pad.top  - pad.bottom;
+
+  // Clear
+  ctx.clearRect(0, 0, cssW, cssH);
+
+  // Grid lines + y-axis labels at 0%, 25%, 50%, 75%, 100%
+  ctx.lineWidth = 1;
+  [0, 25, 50, 75, 100].forEach(pct => {
+    const y = pad.top + H * (1 - pct / 100);
+    ctx.beginPath();
+    ctx.strokeStyle = pct === 50 ? '#2e2e2e' : '#222';
+    ctx.setLineDash(pct === 50 ? [4, 4] : []);
+    ctx.moveTo(pad.left, y);
+    ctx.lineTo(pad.left + W, y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = '#aaa';
+    ctx.font = `${9 * dpr / dpr}px Inter, system-ui, sans-serif`;
+    ctx.textAlign = 'right';
+    ctx.fillText(pct + '%', pad.left - 5, y + 3.5);
+  });
+
+  if (predictionHistory.length < 2) {
+    ctx.fillStyle = '#555';
+    ctx.font = '11px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('swipe more to see accuracy trend', pad.left + W / 2, pad.top + H / 2 + 4);
+    return;
+  }
+
+  // Build running accuracy series
+  const series = [];
+  let correct = 0;
+  predictionHistory.forEach((v, i) => {
+    if (v) correct++;
+    series.push(correct / (i + 1));
+  });
+
+  const n = series.length;
+  const xOf = i => pad.left + (i / (n - 1)) * W;
+  const yOf = v => pad.top  + H * (1 - v);
+
+  // Fill under curve
+  ctx.beginPath();
+  ctx.moveTo(xOf(0), yOf(series[0]));
+  series.forEach((v, i) => ctx.lineTo(xOf(i), yOf(v)));
+  ctx.lineTo(xOf(n - 1), pad.top + H);
+  ctx.lineTo(xOf(0),     pad.top + H);
+  ctx.closePath();
+  const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + H);
+  grad.addColorStop(0,   'rgba(200,200,200,0.07)');
+  grad.addColorStop(1,   'rgba(200,200,200,0)');
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  ctx.moveTo(xOf(0), yOf(series[0]));
+  series.forEach((v, i) => ctx.lineTo(xOf(i), yOf(v)));
+  ctx.strokeStyle = '#aaa';
+  ctx.lineWidth   = 1.5;
+  ctx.lineJoin    = 'round';
+  ctx.stroke();
+
+  // Terminal dot
+  const lx = xOf(n - 1), ly = yOf(series[n - 1]);
+  ctx.beginPath();
+  ctx.arc(lx, ly, 3, 0, Math.PI * 2);
+  ctx.fillStyle = '#ccc';
+  ctx.fill();
+
+  // Current accuracy label next to dot
+  const accPct = (series[n - 1] * 100).toFixed(0) + '%';
+  ctx.fillStyle = '#ccc';
+  ctx.font = '10px Inter, system-ui, sans-serif';
+  ctx.textAlign = lx > pad.left + W - 30 ? 'right' : 'left';
+  ctx.fillText(accPct, lx + (lx > pad.left + W - 30 ? -6 : 6), ly - 5);
+
+  // Hover crosshair
+  const hIdx = canvas._hoverIdx;
+  if (hIdx != null && hIdx >= 0 && hIdx < n) {
+    const cx = xOf(hIdx), cy = yOf(series[hIdx]);
+    ctx.save();
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 1;
+    ctx.moveTo(cx, pad.top); ctx.lineTo(cx, pad.top + H);
+    ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#ddd'; ctx.fill();
+    ctx.restore();
+  }
+}
+
+function renderRewardChart() {
+  const canvas = document.getElementById('reward-chart');
+  if (!canvas) return;
+  const dpr  = window.devicePixelRatio || 1;
+  const cssW = canvas.offsetWidth;
+  const cssH = 120;
+  canvas.width  = cssW * dpr;
+  canvas.height = cssH * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const pad = { top: 10, right: 12, bottom: 10, left: 42 };
+  const W = cssW - pad.left - pad.right;
+  const H = cssH - pad.top  - pad.bottom;
+  ctx.clearRect(0, 0, cssW, cssH);
+
+  if (rewardHistory.length < 2) {
+    ctx.fillStyle = '#555';
+    ctx.font = '11px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('swipe more to see reward curve', pad.left + W / 2, pad.top + H / 2 + 4);
+    return;
+  }
+
+  // Build cumulative reward series
+  const series = [];
+  let cum = 0;
+  rewardHistory.forEach(r => { cum += r; series.push(cum); });
+  const minV = Math.min(...series, 0);
+  const maxV = Math.max(...series, 0);
+  const range = maxV - minV || 1;
+  const yOf = v => pad.top + H * (1 - (v - minV) / range);
+  const xOf = i => pad.left + (i / (series.length - 1)) * W;
+
+  // Y-axis labels + grid at min, 0, max
+  [[minV, '#252525'], [0, '#2e2e2e'], [maxV, '#252525']].forEach(([v, col]) => {
+    const y = yOf(v);
+    ctx.beginPath();
+    ctx.strokeStyle = col;
+    ctx.lineWidth   = 1;
+    ctx.setLineDash(v === 0 ? [4, 4] : []);
+    ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + W, y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    const label = (v >= 0 ? '+' : '') + v.toFixed(1);
+    ctx.fillStyle = '#aaa';
+    ctx.font = '9px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(label, pad.left - 4, y + 3.5);
+  });
+
+  // Fill under / above zero
+  const y0 = yOf(0);
+  const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + H);
+  grad.addColorStop(0,   'rgba(200,200,200,0.09)');
+  grad.addColorStop(1,   'rgba(200,200,200,0)');
+  ctx.beginPath();
+  ctx.moveTo(xOf(0), y0);
+  series.forEach((v, i) => { ctx.lineTo(xOf(i), yOf(v)); });
+  ctx.lineTo(xOf(series.length - 1), y0);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  series.forEach((v, i) => i === 0 ? ctx.moveTo(xOf(0), yOf(v)) : ctx.lineTo(xOf(i), yOf(v)));
+  ctx.strokeStyle = '#aaa'; ctx.lineWidth = 1.5; ctx.lineJoin = 'round';
+  ctx.stroke();
+
+  // Terminal dot + label
+  const lx = xOf(series.length - 1), ly = yOf(series[series.length - 1]);
+  ctx.beginPath(); ctx.arc(lx, ly, 3, 0, Math.PI * 2);
+  ctx.fillStyle = '#ccc'; ctx.fill();
+  ctx.fillStyle = '#ccc';
+  ctx.font = '10px Inter, system-ui, sans-serif';
+  ctx.textAlign = lx > pad.left + W - 30 ? 'right' : 'left';
+  ctx.fillText((series[series.length-1] >= 0 ? '+' : '') + series[series.length-1].toFixed(1),
+               lx + (lx > pad.left + W - 30 ? -6 : 6), ly - 5);
+
+  // Hover crosshair
+  const hIdx = canvas._hoverIdx;
+  if (hIdx != null && hIdx >= 0 && hIdx < series.length) {
+    const cx = xOf(hIdx), cy = yOf(series[hIdx]);
+    ctx.save();
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 1;
+    ctx.moveTo(cx, pad.top); ctx.lineTo(cx, pad.top + H);
+    ctx.stroke();
+    ctx.beginPath(); ctx.arc(cx, cy, 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#ddd'; ctx.fill();
+    ctx.restore();
+  }
+}
+
+function renderDistChart() {
+  const canvas = document.getElementById('dist-chart');
+  if (!canvas) return;
+  const dpr  = window.devicePixelRatio || 1;
+  const cssW = canvas.offsetWidth;
+  const cssH = 180;
+  canvas.width  = cssW * dpr;
+  canvas.height = cssH * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const pad = { top: 10, right: 110, bottom: 10, left: 42 };
+  const W = cssW - pad.left - pad.right;
+  const H = cssH - pad.top  - pad.bottom;
+  ctx.clearRect(0, 0, cssW, cssH);
+
+  if (weightSnapshots.length < 2) {
+    ctx.fillStyle = '#555';
+    ctx.font = '11px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('swipe more to see policy evolution', pad.left + W / 2, pad.top + H / 2 + 4);
+    return;
+  }
+
+  // Pick top 6 tags (styles OR genres) by absolute current weight
+  const last = weightSnapshots[weightSnapshots.length - 1];
+  const topStyles = [...VOCAB]
+    .map(s => ({ s, w: Math.abs(last[s] || 0) }))
+    .sort((a, b) => b.w - a.w)
+    .slice(0, 6)
+    .map(x => x.s);
+
+  // Y range: symmetric around 0
+  let maxAbs = 1e-6;
+  weightSnapshots.forEach(snap => topStyles.forEach(s => {
+    if (Math.abs(snap[s] || 0) > maxAbs) maxAbs = Math.abs(snap[s] || 0);
+  }));
+  const yOf = v => pad.top + H * (0.5 - v / (2 * maxAbs));
+  const xOf = i => pad.left + (i / (weightSnapshots.length - 1)) * W;
+
+  // Zero line
+  ctx.beginPath();
+  ctx.strokeStyle = '#2e2e2e'; ctx.lineWidth = 1; ctx.setLineDash([4, 4]);
+  ctx.moveTo(pad.left, yOf(0)); ctx.lineTo(pad.left + W, yOf(0));
+  ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = '#aaa'; ctx.font = '9px Inter, system-ui, sans-serif';
+  ctx.textAlign = 'right';
+  ctx.fillText('0', pad.left - 4, yOf(0) + 3.5);
+
+  // Y axis extremes
+  [maxAbs, -maxAbs].forEach(v => {
+    ctx.fillStyle = '#aaa'; ctx.textAlign = 'right'; ctx.font = '9px Inter, system-ui, sans-serif';
+    ctx.fillText((v >= 0 ? '+' : '') + v.toFixed(2), pad.left - 4, yOf(v) + 3.5);
+  });
+
+  // Line styles — vary dash pattern for monochromatic distinction
+  const lineDashes = [[], [6,3], [3,3], [6,3,2,3], [2,3], [1,3]];
+  const opacities  = [1, 0.9, 0.8, 0.7, 0.65, 0.55];
+
+  topStyles.forEach((style, si) => {
+    const series = weightSnapshots.map(snap => snap[style] || 0);
+    ctx.save();
+    ctx.globalAlpha = opacities[si];
+    ctx.beginPath();
+    series.forEach((v, i) => i === 0 ? ctx.moveTo(xOf(0), yOf(v)) : ctx.lineTo(xOf(i), yOf(v)));
+    ctx.strokeStyle = '#ccc'; ctx.lineWidth = si === 0 ? 1.5 : 1.2;
+    ctx.lineJoin = 'round'; ctx.setLineDash(lineDashes[si]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Label at right edge
+    const lx = xOf(weightSnapshots.length - 1);
+    const ly = yOf(series[series.length - 1]);
+    ctx.beginPath(); ctx.arc(lx, ly, 2.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#ccc'; ctx.fill();
+    ctx.fillStyle = '#bbb'; ctx.font = '9px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(style, lx + 7, ly + 3.5);
+    ctx.restore();
+  });
+
+  // Hover crosshair
+  const hIdx = canvas._hoverIdx;
+  if (hIdx != null && hIdx >= 0 && hIdx < weightSnapshots.length) {
+    const cx = xOf(hIdx);
+    ctx.save();
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 1; ctx.setLineDash([]);
+    ctx.moveTo(cx, pad.top); ctx.lineTo(cx, pad.top + H);
+    ctx.stroke();
+    topStyles.forEach((style, si) => {
+      const v = weightSnapshots[hIdx][style] || 0;
+      ctx.beginPath(); ctx.arc(cx, yOf(v), 3, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(220,220,220,${opacities[si]})`; ctx.fill();
+    });
+    ctx.restore();
+  }
+}
+
+function addLog(artwork, dir, reward) {
+  const wrap = document.getElementById('log-wrap');
+  // Remove placeholder
+  const ph = wrap.querySelector('[style*="justify-content"]');
+  if (ph) ph.remove();
+
+  const row  = document.createElement('div');
+  row.className = 'log-row';
+  const action = dir === 'skip' ? 'skipped' : (dir === 'right' ? 'liked' : 'passed');
+  const actCls = dir === 'skip' ? 'skip'    : (dir === 'right' ? 'like'  : 'pass');
+  row.innerHTML = `
+    <span class="log-name">${artwork.title.slice(0, 26)}</span>
+    <span class="log-act ${actCls}">${action}</span>
+    <span class="log-rwd">${reward >= 0 ? '+' : ''}${reward.toFixed(1)}</span>`;
+  wrap.insertBefore(row, wrap.firstChild);
+  while (wrap.children.length > 20) wrap.removeChild(wrap.lastChild);
+}
+
+function updateHeaderStats() {
+  const acc = predictionHistory.length
+    ? (predictionHistory.filter(x => x).length / predictionHistory.length * 100).toFixed(0) + '%'
+    : '—';
+  document.getElementById('h-liked').textContent   = nLiked;
+  document.getElementById('h-passed').textContent  = nPassed;
+  document.getElementById('h-skipped').textContent = nSkipped;
+  document.getElementById('h-acc').textContent     = acc;
+}
+
+function renderGallery() {
+  const grid  = document.getElementById('gallery-grid');
+  const count = document.getElementById('gallery-count');
+  if (!grid) return;
+
+  count.textContent = `${likedArtworks.length} work${likedArtworks.length !== 1 ? 's' : ''}`;
+
+  if (likedArtworks.length === 0) {
+    grid.innerHTML = '<p class="gallery-empty">No liked artworks yet — start swiping.</p>';
+    return;
+  }
+
+  // Most recent first
+  grid.innerHTML = '';
+  [...likedArtworks].reverse().forEach(artwork => {
+    const item = document.createElement('a');
+    item.className = 'gallery-item';
+    item.href = artwork.sourceUrl || '#';
+    item.target = '_blank';
+    item.rel = 'noopener';
+    item.innerHTML = `
+      <div class="gallery-img-wrap">
+        <img src="${artwork.imageUrl}" alt="${artwork.title}" loading="lazy">
+      </div>
+      <div class="gallery-item-title">${artwork.title}</div>
+      <div class="gallery-item-artist">${artwork.artist}${artwork.year ? ', ' + artwork.year : ''}</div>`;
+    grid.appendChild(item);
+  });
+}
+
+function showView(view) {
+  // view: 'swipe' | 'gallery'
+  const swipeSection   = document.querySelector('.swipe-section');
+  const dashboard      = document.querySelector('.dashboard');
+  const gallerySection = document.getElementById('gallery-section');
+  if (view === 'gallery') {
+    swipeSection.style.display   = 'none';
+    dashboard.style.display      = 'none';
+    gallerySection.classList.add('visible');
+    renderGallery();
+  } else {
+    swipeSection.style.display   = '';
+    dashboard.style.display      = '';
+    gallerySection.classList.remove('visible');
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   KEYBOARD
+═══════════════════════════════════════════════════════════ */
+
+function skipFront() {
+  if (isProcessing || !deck[deckIdx]) return;
+  const c = document.querySelector('.painting-card');
+  if (!c) return;
+  c.style.transition = 'opacity 0.2s ease, transform 0.2s ease';
+  c.style.opacity = '0';
+  c.style.transform = 'scale(0.96)';
+  slideIn = true;
+  setTimeout(() => { c.remove(); handleSwipe('skip'); }, 220);
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === 'd') {
+    const c = document.querySelector('.painting-card');
+    if (c) flyCard(c, 'right');
+  }
+  if (e.key === 'ArrowLeft' || e.key === 'a') {
+    const c = document.querySelector('.painting-card');
+    if (c) flyCard(c, 'left');
+  }
+  if (e.key === ' ') {
+    e.preventDefault();
+    skipFront();
+  }
+});
+
+document.getElementById('btn-nope').onclick = () => {
+  const c = document.querySelector('.painting-card');
+  if (c) flyCard(c, 'left');
+};
+document.getElementById('btn-skip').onclick = skipFront;
+document.getElementById('btn-like').onclick = () => {
+  const c = document.querySelector('.painting-card');
+  if (c) flyCard(c, 'right');
+};
+
+/* ═══════════════════════════════════════════════════════════
+   INITIALISATION
+═══════════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════════
+   LOCALSTORAGE PERSISTENCE
+═══════════════════════════════════════════════════════════ */
+
+const LS_KEY = 'artswipe_v1';
+
+async function saveState() {
+  try {
+    const weights = model.getWeights().map(w => Array.from(w.dataSync()));
+    const state = {
+      weights,
+      trainingSteps, nLiked, nPassed, nSkipped,
+      likedScores, passedScores,
+      predictionHistory, rewardHistory, weightSnapshots,
+      tagSampleCounts: { ...tagSampleCounts },
+      lastτ,
+      likedArtworks,
+    };
+    localStorage.setItem(LS_KEY, JSON.stringify(state));
+  } catch (e) {
+    console.warn('saveState failed', e.message);
+  }
+}
+
+async function loadState() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return false;
+    const state = JSON.parse(raw);
+    if (!state.weights || state.weights.length !== model.getWeights().length) return false;
+    const tensors = state.weights.map((w, i) => {
+      const shape = model.getWeights()[i].shape;
+      return tf.tensor(w, shape);
+    });
+    model.setWeights(tensors);
+    tensors.forEach(t => t.dispose());
+
+    trainingSteps      = state.trainingSteps      || 0;
+    nLiked             = state.nLiked             || 0;
+    nPassed            = state.nPassed            || 0;
+    nSkipped           = state.nSkipped           || 0;
+    likedScores        = state.likedScores        || [];
+    passedScores       = state.passedScores       || [];
+    predictionHistory  = state.predictionHistory  || [];
+    rewardHistory      = state.rewardHistory      || [];
+    weightSnapshots    = state.weightSnapshots     || [];
+    lastτ              = state.lastτ              ?? τ_MAX;
+    Object.assign(tagSampleCounts, state.tagSampleCounts || {});
+    likedArtworks      = state.likedArtworks      || [];
+    return true;
+  } catch (e) {
+    console.warn('loadState failed', e.message);
+    return false;
+  }
+}
+
+function clearState() {
+  localStorage.removeItem(LS_KEY);
+}
+
+function setStatus(msg) {
+  const el = document.getElementById('ld-status');
+  if (el) el.textContent = msg;
+}
+
+async function init() {
+  try {
+    setStatus('Building neural network…');
+    await tf.ready();
+    model = await buildModel();
+    document.getElementById('ds-arch').textContent =
+      `[${VOCAB_SIZE} → 16 → 1]  MSE / Adam 0.01`;
+
+    const resumed = await loadState();
+    if (resumed) setStatus(`Resumed — ${trainingSteps} training steps loaded`);
+
+    // Fetch initial seed styles in parallel (first page each)
+    setStatus('Fetching artworks from WikiArt…');
+    const seedStyles = FETCH_STYLES.slice(0, 8);
+    lastSrc = seedStyles.join(', ');
+
+    const fetches = seedStyles.map(async style => {
+      stylePages[style] = 1;
+      try {
+        const data  = await fetchStylePage(style, 1);
+        const fresh = (data.Paintings || [])
+          .filter(p => p.id && !seenIds.has(p.id))
+          .map(p => { seenIds.add(p.id); return makeArtwork(p, style); });
+        return fresh;
+      } catch (e) {
+        console.warn(`init: ${style} failed`, e.message);
+        return [];
+      }
+    });
+
+    const batches = await Promise.allSettled(fetches);
+    batches.forEach(r => { if (r.status === 'fulfilled') deck.push(...r.value); });
+
+    // Shuffle
+    for (let i = deck.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+
+    setStatus(`Loaded ${deck.length} artworks. Starting…`);
+
+    renderStack();
+    renderWeightChart();
+    updateDashboard();
+
+    // Hide loading
+    const ov = document.getElementById('loading');
+    ov.classList.add('out');
+    setTimeout(() => ov.remove(), 600);
+
+  } catch (err) {
+    console.error(err);
+    setStatus(`Error: ${err.message} — please refresh.`);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
+   DEBUG MODE
+═══════════════════════════════════════════════════════════ */
+
+function activateDebug(value) {
+  // value is "genre:portrait" or "style:impressionism"
+  const [type, slug] = value.split(':');
+  debugGenre = slug;
+  debugType  = type;
+  debugGenrePage = 1;
+
+  // Reset deck and repetition window
+  deck = [];
+  deckIdx = 0;
+  seenIds.clear();
+  slideIn = false;
+  recentStyleWindows = [];
+
+  // Show banner
+  let banner = document.getElementById('debug-banner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'debug-banner';
+    banner.className = 'debug-banner';
+    document.body.appendChild(banner);
+  }
+  banner.textContent = `Debug mode — ${type} locked to: ${slug}`;
+
+  document.getElementById('debug-activate').textContent = 'Deactivate';
+  document.getElementById('debug-activate').classList.add('off');
+  document.getElementById('debug-toggle').classList.add('active');
+
+  const area = document.getElementById('painting-area');
+  area.querySelectorAll('.painting-card').forEach(c => c.remove());
+  area.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#aaa;font-size:0.75rem;letter-spacing:.1em">Loading…</div>';
+
+  const fetchFn = type === 'style' ? fetchStylePage : fetchGenrePage;
+  const pagesToFetch = [1, 3, 6, 10, 15];
+  debugGenrePage = Math.max(...pagesToFetch) + 1;
+
+  Promise.allSettled(pagesToFetch.map(p => fetchFn(slug, p))).then(results => {
+    const fresh = [];
+    results.forEach(r => {
+      if (r.status !== 'fulfilled') return;
+      (r.value.Paintings || [])
+        .filter(p => p.id && !seenIds.has(p.id))
+        .forEach(p => {
+          seenIds.add(p.id);
+          const a = makeArtwork(p, slug); // tags already = [slug, century?]
+          a.metaLoaded = true;
+          fresh.push(a);
+        });
+    });
+    for (let i = fresh.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [fresh[i], fresh[j]] = [fresh[j], fresh[i]];
+    }
+    deck.push(...fresh);
+    renderStack();
+    updateDashboard();
+  }).catch(e => {
+    area.innerHTML = `<div style="color:#e44;padding:2rem;font-size:.75rem">Failed to load: ${e.message}</div>`;
+  });
+}
+
+function deactivateDebug() {
+  debugGenre = null;
+  debugType  = 'genre';
+  debugGenrePage = 1;
+  const banner = document.getElementById('debug-banner');
+  if (banner) banner.remove();
+  document.getElementById('debug-activate').textContent = 'Activate';
+  document.getElementById('debug-activate').classList.remove('off');
+  document.getElementById('debug-toggle').classList.remove('active');
+  document.getElementById('debug-panel').classList.remove('open');
+
+  // Clear the debug-only deck and reload with normal mixed content
+  deck = [];
+  deckIdx = 0;
+  seenIds.clear();
+  recentStyleWindows = [];
+  Object.keys(stylePages).forEach(k => delete stylePages[k]);
+  lastSrc = '—';
+  slideIn = false;
+  isRefilling = false;
+
+  const area = document.getElementById('painting-area');
+  area.querySelectorAll('.painting-card').forEach(c => c.remove());
+  area.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#aaa;font-size:0.75rem;letter-spacing:.1em">Loading…</div>';
+
+  const seedStyles = FETCH_STYLES.slice(0, 8);
+  const fetches = seedStyles.map(async style => {
+    stylePages[style] = 1;
+    try {
+      const data  = await fetchStylePage(style, 1);
+      const fresh = (data.Paintings || [])
+        .filter(p => p.id && !seenIds.has(p.id))
+        .map(p => { seenIds.add(p.id); return makeArtwork(p, style); });
+      deck.push(...fresh);
+    } catch (_) {}
+  });
+  Promise.allSettled(fetches).then(() => {
+    for (let i = deck.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [deck[i], deck[j]] = [deck[j], deck[i]];
+    }
+    renderStack();
+    updateDashboard();
+  });
+}
+
+// Attach debug panel listeners once DOM is ready, then kick off init
+function setupDebugListeners() {
+  document.getElementById('nav-gallery').addEventListener('click', e => {
+    e.preventDefault();
+    showView('gallery');
+  });
+  document.getElementById('nav-swipe').addEventListener('click', e => {
+    e.preventDefault();
+    showView('swipe');
+  });
+
+  document.getElementById('debug-toggle').addEventListener('click', () => {
+    document.getElementById('debug-panel').classList.toggle('open');
+  });
+  document.getElementById('debug-activate').addEventListener('click', () => {
+    if (debugGenre) {
+      deactivateDebug();
+    } else {
+      const value = document.getElementById('debug-genre-select').value;
+      activateDebug(value);
+      document.getElementById('debug-panel').classList.remove('open');
+    }
+  });
+  document.getElementById('clear-state').addEventListener('click', () => {
+    if (!confirm('Clear all saved model weights and training history?')) return;
+    clearState();
+    // Reset all in-memory state and reinitialise
+    trainingSteps = 0; nLiked = 0; nPassed = 0; nSkipped = 0;
+    likedScores = []; passedScores = []; likedArtworks = [];
+    predictionHistory = []; rewardHistory = []; weightSnapshots = [];
+    recentStyleWindows = [];
+    lastτ = τ_MAX; lastReward = null; lastPenalty = false;
+    Object.keys(tagSampleCounts).forEach(k => delete tagSampleCounts[k]);
+    model.setWeights(model.getWeights().map(w => tf.initializers.glorotNormal({}).apply(w.shape)));
+    updateDashboard();
+    updateHeaderStats();
+    document.getElementById('debug-panel').classList.remove('open');
+  });
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => { setupDebugListeners(); init(); });
+} else {
+  setupDebugListeners(); init();
+}
+</script>
+
+<div id="chart-tooltip"></div>
+
+<!-- Debug panel -->
+<button id="debug-toggle" title="Debug mode">⚙</button>
+<div id="debug-panel">
+  <div class="debug-label">Debug — lock to single tag</div>
+  <select id="debug-genre-select">
+    <optgroup label="Genres">
+      <option value="genre:portrait">Portrait</option>
+      <option value="genre:landscape">Landscape</option>
+      <option value="genre:still-life">Still Life</option>
+      <option value="genre:religious-painting">Religious Painting</option>
+      <option value="genre:genre-painting">Genre Painting</option>
+      <option value="genre:cityscape">Cityscape</option>
+      <option value="genre:nude-painting">Nude Painting</option>
+      <option value="genre:animal-painting">Animal Painting</option>
+      <option value="genre:flower-painting">Flower Painting</option>
+      <option value="genre:history-painting">History Painting</option>
+    </optgroup>
+    <optgroup label="Styles">
+      <option value="style:impressionism">Impressionism</option>
+      <option value="style:post-impressionism">Post-Impressionism</option>
+      <option value="style:surrealism">Surrealism</option>
+      <option value="style:expressionism">Expressionism</option>
+      <option value="style:realism">Realism</option>
+      <option value="style:romanticism">Romanticism</option>
+      <option value="style:baroque">Baroque</option>
+      <option value="style:rococo">Rococo</option>
+      <option value="style:cubism">Cubism</option>
+      <option value="style:symbolism">Symbolism</option>
+      <option value="style:abstract-expressionism">Abstract Expressionism</option>
+      <option value="style:pop-art">Pop Art</option>
+      <option value="style:fauvism">Fauvism</option>
+      <option value="style:art-nouveau-modern">Art Nouveau</option>
+      <option value="style:neoclassicism">Neoclassicism</option>
+      <option value="style:academicism">Academicism</option>
+      <option value="style:high-renaissance">High Renaissance</option>
+      <option value="style:northern-renaissance">Northern Renaissance</option>
+      <option value="style:mannerism-late-renaissance">Mannerism</option>
+      <option value="style:pre-raphaelitism">Pre-Raphaelitism</option>
+      <option value="style:orientalism">Orientalism</option>
+      <option value="style:pointillism">Pointillism</option>
+      <option value="style:minimalism">Minimalism</option>
+      <option value="style:futurism">Futurism</option>
+      <option value="style:dadaism">Dadaism</option>
+      <option value="style:suprematism">Suprematism</option>
+      <option value="style:constructivism">Constructivism</option>
+      <option value="style:photorealism">Photorealism</option>
+      <option value="style:magic-realism">Magic Realism</option>
+      <option value="style:naive-art-primitivism">Naïve Art</option>
+      <option value="style:social-realism">Social Realism</option>
+      <option value="style:color-field-painting">Color Field</option>
+    </optgroup>
+  </select>
+  <button id="debug-activate">Activate</button>
+  <button id="clear-state">Clear saved data</button>
+</div>
+
+</body>
+</html>
