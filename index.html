@@ -31,7 +31,7 @@ body { font-family: var(--sans); background: #fff; color: var(--ink); min-height
   gap: 1.4rem; z-index: 300; transition: opacity 0.5s ease;
 }
 #loading.out { opacity: 0; pointer-events: none; }
-.ld-title { font-family: var(--serif); font-size: 1.6rem; font-weight: 400; font-style: italic; }
+.ld-title { font-family: var(--serif); font-size: 1.6rem; font-weight: 400; font-style: normal; }
 .ld-dots  { display: flex; gap: 6px; }
 .ld-dot   { width: 6px; height: 6px; border-radius: 50%; background: #ccc; animation: dp 1.3s ease-in-out infinite; }
 .ld-dot:nth-child(2) { animation-delay: .18s; }
@@ -49,30 +49,35 @@ header {
   border-bottom: 1px solid var(--rule);
 }
 .logo {
-  font-family: var(--serif); font-weight: 400; font-style: italic;
+  font-family: var(--serif); font-weight: 400; font-style: normal;
   font-size: 1rem; letter-spacing: .01em; color: var(--ink);
   text-decoration: none;
 }
 .hdr-stats {
   font-size: 0.7rem; color: var(--ghost); letter-spacing: .03em;
-  display: flex; gap: 1.4rem;
+  display: flex; align-items: center; gap: 0;
+  margin-left: auto;
 }
 .hdr-stats span { color: var(--ink); font-weight: 500; }
-.hdr-liked-link {
-  color: var(--ghost); text-decoration: none;
+.hdr-liked-btn {
+  display: inline-flex; align-items: center; gap: 0.2em;
+  color: var(--ink); font-weight: 500; text-decoration: none;
+  border: 1.5px solid var(--rule); border-radius: 6px;
+  padding: 0.15rem 0.55rem; margin-right: 0.5rem;
+  transition: border-color 0.15s, background 0.15s;
 }
-.hdr-liked-link:hover { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; }
+.hdr-liked-btn:hover { border-color: #bbb; background: var(--off); }
 
-.hdr-io { display: flex; gap: 0.5rem; align-items: center; }
 .hdr-io-btn {
   font-size: 0.62rem; letter-spacing: .04em;
   padding: 0.25rem 0.65rem;
-  border: 1px solid var(--rule); border-radius: 4px;
-  background: transparent; color: var(--ghost);
+  border: 1px solid #333; border-radius: 4px;
+  background: transparent; color: #999;
   cursor: pointer; font-family: var(--sans);
   text-decoration: none; display: inline-block;
 }
-.hdr-io-btn:hover { color: var(--ink); border-color: #bbb; }
+.hdr-io-btn:hover { color: #ccc; border-color: #555; }
+.dash-io { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
 
 /* ── MOBILE LAYOUT ── */
 @media (max-width: 768px) {
@@ -118,10 +123,11 @@ header {
   font-size: 0.85rem;
   pointer-events: auto;
 }
-.mobile-overlay-meta .artwork-byline {
-  font-size: 0.62rem;
+.mobile-overlay-meta .artwork-artist {
+  font-size: 0.7rem;
   pointer-events: auto;
 }
+.mobile-overlay-meta .artwork-year { font-size: 0.6rem; }
 .mobile-overlay-meta .artwork-tags { display: none; }
 
 .mobile-overlay-btns {
@@ -146,15 +152,15 @@ header {
   overflow: hidden;
 }
 
-/* ── LEFT PANEL (meta + buttons) ── */
+/* ── LEFT PANEL (meta + buttons + score) ── */
 .side-left {
   width: 200px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 2rem;
-  padding: 2rem 1.5rem 2rem 2rem;
+  justify-content: flex-start;
+  gap: 1.4rem;
+  padding: 1.5rem 1.5rem 2rem 1.5rem;
 }
 
 /* ── PAINTING AREA (fills remaining space) ── */
@@ -185,6 +191,7 @@ header {
   object-fit: contain;
   pointer-events: none;
   outline: 20px solid #F3E1D4;
+  filter: drop-shadow(0 16px 48px rgba(0,0,0,0.18)) drop-shadow(0 4px 12px rgba(0,0,0,0.10));
 }
 .painting-card.err img { display: none; }
 .painting-card.err::after {
@@ -195,43 +202,43 @@ header {
   color: var(--ghost); background: var(--off);
 }
 
-/* ── RIGHT PANEL (match score) ── */
-.side-right {
-  width: 120px;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-  padding: 1.5rem 1.5rem 2rem 1rem;
-}
+/* ── RIGHT PANEL (removed) ── */
+.side-right { display: none; }
 
 /* ── ARTWORK META (left side panel) ── */
-.artwork-meta { /* no padding needed — side-panel handles spacing */ }
+.artwork-meta { }
 .artwork-title {
   display: block;
   font-family: var(--serif); font-size: 1rem;
-  font-weight: 400; font-style: italic; line-height: 1.4;
+  font-weight: 600; font-style: normal; line-height: 1.35;
   color: var(--ink); text-decoration: none;
 }
 .artwork-title:hover { text-decoration: underline; text-underline-offset: 3px; }
 
-.artwork-byline {
-  display: block; margin-top: 0.35rem;
-  font-size: 0.7rem; color: var(--dim);
-  text-decoration: none; line-height: 1.5;
+.artwork-artist {
+  display: block; margin-top: 0.3rem;
+  font-family: var(--serif); font-style: normal; font-size: 0.82rem;
+  color: var(--dim); text-decoration: none; line-height: 1.4;
 }
-.artwork-byline:hover { color: var(--ink); }
+.artwork-artist:hover { color: var(--ink); }
+
+.artwork-year {
+  display: block;
+  font-family: var(--sans); font-size: 0.65rem;
+  letter-spacing: .06em; color: var(--ghost);
+  margin-top: 0.1rem;
+}
 
 .artwork-tags {
-  display: flex; flex-wrap: wrap; justify-content: flex-start;
-  gap: 0.25rem; margin-top: 0.8rem;
+  display: flex; flex-direction: column;
+  gap: 0.18rem; margin-top: 0.7rem;
 }
 .tag {
-  font-size: 0.55rem; letter-spacing: .05em;
-  padding: 0.18rem 0.55rem;
-  border: 1px solid var(--rule); border-radius: 50px;
+  font-size: 0.54rem; letter-spacing: .06em; text-transform: uppercase;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--rule); border-radius: 3px;
   color: var(--ghost); background: #fff;
-  white-space: nowrap;
+  white-space: nowrap; align-self: flex-start;
 }
 .tag.loading-tag { background: var(--off); color: transparent; width: 60px; animation: shimmer 1.2s infinite; }
 @keyframes shimmer { 0%,100%{opacity:.4} 50%{opacity:.9} }
@@ -239,7 +246,7 @@ header {
 /* ── SWIPE INDICATORS ── */
 .swipe-ind {
   position: absolute; top: 24px;
-  font-family: var(--serif); font-size: 1.3rem; font-style: italic;
+  font-family: var(--serif); font-size: 1.3rem; font-style: normal;
   border: 2px solid; border-radius: 4px;
   padding: 0.2rem 0.65rem;
   opacity: 0; z-index: 20; pointer-events: none;
@@ -248,15 +255,16 @@ header {
 .ind-like { right: 16px; color: #2a2a2a; border-color: #2a2a2a; transform: rotate(-12deg); }
 .ind-nope { left: 16px;  color: #888;    border-color: #888;    transform: rotate(12deg); }
 
-/* ── PREDICTION (top-right panel) ── */
+/* ── PREDICTION ── */
 .pred-wrap { text-align: left; }
 .pred-label {
-  font-size: 0.48rem; letter-spacing: .18em;
-  text-transform: uppercase; color: var(--ghost); margin-bottom: .3rem;
+  font-size: 0.46rem; letter-spacing: .22em;
+  text-transform: uppercase; color: var(--ghost); margin-bottom: .35rem;
+  font-family: var(--sans);
 }
 .pred-score {
-  font-family: var(--serif); font-size: 1.1rem;
-  font-weight: 400; line-height: 1; color: var(--ink);
+  font-family: var(--serif); font-size: 1.15rem;
+  font-weight: 600; line-height: 1; color: var(--ink);
 }
 .pred-track {
   width: 100%; height: 1.5px; background: var(--rule);
@@ -265,19 +273,20 @@ header {
 .pred-fill { height: 100%; background: var(--ink); transition: width 0.5s ease; }
 
 /* ── ACTION BUTTONS ── */
-.action-btns { display: flex; align-items: center; gap: 0.75rem; }
+.action-btns { display: flex; align-items: center; gap: 0.5rem; }
 .action-btn {
-  width: 44px; height: 44px;
+  width: 42px; height: 42px;
   border-radius: 50%; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
-  transition: transform 0.12s ease;
-  background: #fff; border: 1.5px solid var(--rule);
-  color: var(--ghost); font-size: 1rem;
+  transition: background 0.15s ease, transform 0.12s ease;
+  background: transparent; border: none;
+  color: var(--dim);
   flex-shrink: 0;
 }
-.action-btn:hover  { transform: scale(1.08); }
-.action-btn:active { transform: scale(0.92); }
-.action-btn:disabled { opacity: .35; cursor: default; transform: none; }
+.action-btn:hover  { background: rgba(0,0,0,0.06); transform: scale(1.06); }
+.action-btn:active { transform: scale(0.90); }
+.action-btn:disabled { opacity: .3; cursor: default; transform: none; }
+.action-btn svg { display: block; }
 .btn-like { color: var(--ink); }
 
 /* ── SCROLL CUE ── */
@@ -350,7 +359,7 @@ header {
   display: flex; flex-direction: column; align-items: center;
   gap: 1rem; padding: 4rem 2rem; text-align: center;
 }
-.empty-state p { font-family: var(--serif); font-style: italic; color: var(--dim); }
+.empty-state p { font-family: var(--serif); font-style: normal; color: var(--dim); }
 .restart-btn {
   padding: 0.65rem 1.6rem; background: var(--ink); color: #fff;
   border: none; border-radius: 6px; font-size: 0.78rem;
@@ -487,7 +496,7 @@ kbd {
   margin-bottom: 2.5rem; border-bottom: 1px solid var(--rule); padding-bottom: 1rem;
 }
 .gallery-title {
-  font-family: var(--serif); font-style: italic;
+  font-family: var(--serif); font-style: normal;
   font-size: 1.3rem; font-weight: 400; color: var(--ink);
 }
 .gallery-count {
@@ -512,7 +521,7 @@ kbd {
   width: 100%; height: auto; display: block;
 }
 .gallery-item-title {
-  font-family: var(--serif); font-style: italic;
+  font-family: var(--serif); font-style: normal;
   font-size: 0.78rem; color: var(--ink); line-height: 1.35;
   margin-top: 0.7rem;
   text-decoration: none;
@@ -523,7 +532,7 @@ kbd {
   text-decoration: none;
 }
 .gallery-empty {
-  font-family: var(--serif); font-style: italic;
+  font-family: var(--serif); font-style: normal;
   color: var(--ghost); font-size: 1rem; padding: 3rem 0;
 }
 
@@ -555,7 +564,7 @@ kbd {
 <header>
   <a class="logo" href="#" id="nav-swipe">ArtSwipe</a>
   <div class="hdr-stats">
-    <span id="h-liked">0</span>&nbsp;<a href="#" id="nav-gallery" class="hdr-liked-link">liked</a>
+    <a href="#" id="nav-gallery" class="hdr-liked-btn"><span id="h-liked">0</span>&nbsp;liked</a>
     &nbsp;·&nbsp;
     <span id="h-passed">0</span>&nbsp;passed
     &nbsp;·&nbsp;
@@ -563,22 +572,29 @@ kbd {
     &nbsp;·&nbsp;
     <span id="h-acc">—</span>&nbsp;acc
   </div>
-  <div class="hdr-io">
-    <button class="hdr-io-btn" id="btn-export" title="Export model &amp; history">Export</button>
-    <label class="hdr-io-btn" id="btn-import-label" title="Import model &amp; history">Import<input type="file" id="import-file" accept=".json" style="display:none"></label>
-  </div>
 </header>
 
 <!-- Swipe section -->
 <section class="swipe-section">
 
-  <!-- Left: title / artist / tags + action buttons -->
+  <!-- Left: title / artist / tags + action buttons + match score -->
   <div class="side-left" id="left-panel">
     <!-- artwork meta injected here by renderLeftPanel -->
     <div class="action-btns">
-      <button class="action-btn btn-nope"  id="btn-nope"  title="Pass [←]">✕</button>
-      <button class="action-btn btn-skip"  id="btn-skip"  title="Skip [Space]">–</button>
-      <button class="action-btn btn-like"  id="btn-like"  title="Like [→]">★</button>
+      <button class="action-btn btn-nope" id="btn-nope" title="Pass [←]">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg>
+      </button>
+      <button class="action-btn btn-skip" id="btn-skip" title="Skip [Space]">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="8" x2="11" y2="8"/><polyline points="7,4 11,8 7,12"/><line x1="13" y1="4" x2="13" y2="12"/></svg>
+      </button>
+      <button class="action-btn btn-like" id="btn-like" title="Like [→]">
+        <svg width="17" height="17" viewBox="0 0 17 17" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5S1.5 10.3 1.5 5.8a3.6 3.6 0 0 1 7-1.2 3.6 3.6 0 0 1 7 1.2c0 4.5-7 8.7-7 8.7z"/></svg>
+      </button>
+    </div>
+    <div class="pred-wrap">
+      <div class="pred-label">Match Score</div>
+      <div class="pred-score" id="pred-score">—</div>
+      <div class="pred-track"><div class="pred-fill" id="pred-fill" style="width:0"></div></div>
     </div>
   </div>
 
@@ -589,18 +605,15 @@ kbd {
     <!-- Mobile overlays (hidden on desktop) -->
     <div class="mobile-overlay-meta" id="mobile-meta"></div>
     <div class="mobile-overlay-btns" id="mobile-btns">
-      <button class="action-btn btn-nope" id="mob-nope" title="Pass">✕</button>
-      <button class="action-btn btn-skip" id="mob-skip" title="Skip">–</button>
-      <button class="action-btn btn-like" id="mob-like" title="Like">★</button>
-    </div>
-  </div>
-
-  <!-- Right: match score -->
-  <div class="side-right">
-    <div class="pred-wrap">
-      <div class="pred-label">Match Score</div>
-      <div class="pred-score" id="pred-score">—</div>
-      <div class="pred-track"><div class="pred-fill" id="pred-fill" style="width:0"></div></div>
+      <button class="action-btn btn-nope" id="mob-nope" title="Pass">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><line x1="3" y1="3" x2="13" y2="13"/><line x1="13" y1="3" x2="3" y2="13"/></svg>
+      </button>
+      <button class="action-btn btn-skip" id="mob-skip" title="Skip">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><line x1="2" y1="8" x2="11" y2="8"/><polyline points="7,4 11,8 7,12"/><line x1="13" y1="4" x2="13" y2="12"/></svg>
+      </button>
+      <button class="action-btn btn-like" id="mob-like" title="Like">
+        <svg width="17" height="17" viewBox="0 0 17 17" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5S1.5 10.3 1.5 5.8a3.6 3.6 0 0 1 7-1.2 3.6 3.6 0 0 1 7 1.2c0 4.5-7 8.7-7 8.7z"/></svg>
+      </button>
     </div>
   </div>
 
@@ -609,6 +622,11 @@ kbd {
 <!-- Dashboard -->
 <section class="dashboard">
   <div class="dash-inner">
+
+    <div class="dash-io">
+      <button class="hdr-io-btn" id="btn-export" title="Export model &amp; history">Export</button>
+      <label class="hdr-io-btn" id="btn-import-label" title="Import model &amp; history">Import<input type="file" id="import-file" accept=".json" style="display:none"></label>
+    </div>
 
     <div class="dash-eyebrow">Neural Network · Interpretability</div>
     <div class="dash-headline">What the model has learned</div>
@@ -671,7 +689,7 @@ kbd {
       </div>
 
       <div class="dash-card">
-        <div class="dash-card-label">Cumulative Reward — RL Signal</div>
+        <div class="dash-card-label">Predicted Score — Liked vs Disliked</div>
         <canvas id="reward-chart" height="140" style="width:100%;display:block"></canvas>
         <div class="acc-chart-hint">swipe number →</div>
       </div>
@@ -691,6 +709,7 @@ kbd {
       <kbd>→</kbd> like &nbsp;&nbsp;
       <kbd>Esc</kbd> close detail
     </div>
+
 
   </div>
 </section>
@@ -901,7 +920,7 @@ let nLiked = 0, nPassed = 0, nSkipped = 0;
 let likedScores  = [], passedScores = [];
 let likedArtworks = []; // full artwork objects for the gallery
 let predictionHistory = []; // true/false per swipe — was the pre-swipe prediction correct?
-let rewardHistory    = []; // finalReward per swipe (for cumulative reward curve)
+let scoreHistory     = []; // {type:'like'|'pass', score} pre-training prediction per non-skip swipe
 let weightSnapshots  = []; // snapshot of STYLES weights after each training step
 
 
@@ -1135,9 +1154,11 @@ function renderLeftPanel(artwork) {
   const panel = document.getElementById('left-panel');
   if (!panel) return;
 
-  // Remove old meta block (preserve the .action-btns which is last child)
+  // Remove old meta block (preserve action buttons and match score)
   const btns = panel.querySelector('.action-btns');
+  const pred = panel.querySelector('.pred-wrap');
   panel.innerHTML = '';
+  if (pred) panel.appendChild(pred);
   if (btns) panel.appendChild(btns);
 
   if (!artwork) return;
@@ -1149,12 +1170,16 @@ function renderLeftPanel(artwork) {
   titleLink.rel         = 'noopener';
   titleLink.textContent = artwork.title;
 
-  const bylineLink = document.createElement('a');
-  bylineLink.className   = 'artwork-byline';
-  bylineLink.href        = artwork.artistUrl;
-  bylineLink.target      = '_blank';
-  bylineLink.rel         = 'noopener';
-  bylineLink.textContent = artwork.year ? `${artwork.artist}\n${artwork.year}` : artwork.artist;
+  const artistLink = document.createElement('a');
+  artistLink.className   = 'artwork-artist';
+  artistLink.href        = artwork.artistUrl;
+  artistLink.target      = '_blank';
+  artistLink.rel         = 'noopener';
+  artistLink.textContent = artwork.artist;
+
+  const yearSpan = document.createElement('span');
+  yearSpan.className   = 'artwork-year';
+  yearSpan.textContent = artwork.year || '';
 
   const tagsDiv = document.createElement('div');
   tagsDiv.className = 'artwork-tags';
@@ -1163,18 +1188,20 @@ function renderLeftPanel(artwork) {
   const meta = document.createElement('div');
   meta.className = 'artwork-meta';
   meta.appendChild(titleLink);
-  meta.appendChild(bylineLink);
+  meta.appendChild(artistLink);
+  if (artwork.year) meta.appendChild(yearSpan);
   meta.appendChild(tagsDiv);
 
-  // Insert meta before buttons
-  panel.insertBefore(meta, btns);
+  // Order: meta → pred → btns
+  panel.insertBefore(meta, pred || btns || null);
 
-  // Mirror title + byline into the mobile overlay
+  // Mirror title + artist into the mobile overlay
   const mob = document.getElementById('mobile-meta');
   if (mob) {
     mob.innerHTML = '';
     mob.appendChild(titleLink.cloneNode(true));
-    mob.appendChild(bylineLink.cloneNode(true));
+    mob.appendChild(artistLink.cloneNode(true));
+    if (artwork.year) mob.appendChild(yearSpan.cloneNode(true));
   }
 }
 
@@ -1194,31 +1221,31 @@ function renderTags(container, artwork) {
   const weights = getTagWeights();
   const weightMap = {};
   weights.forEach(w => weightMap[w.tag] = w.weight);
-  const relevant = artwork.tags.filter(t => t in weightMap);
-  const maxAbs = relevant.length
-    ? Math.max(...relevant.map(t => Math.abs(weightMap[t])), 0.01)
-    : 0.01;
 
-  artwork.tags.slice(0, 7).forEach(t => {
+  // Sort tags by absolute weight descending (most important first)
+  const sorted = artwork.tags
+    .slice(0, 10)
+    .map(t => ({ t, abs: Math.abs(weightMap[t] || 0), w: weightMap[t] || 0 }))
+    .sort((a, b) => b.abs - a.abs);
+
+  const maxAbs = sorted.length ? Math.max(sorted[0].abs, 0.01) : 0.01;
+
+  sorted.forEach(({ t, abs, w }) => {
     const s = document.createElement('span');
     s.className = 'tag';
     s.textContent = t;
-    if (t in weightMap && maxAbs > 0.01) {
-      const w = weightMap[t];
-      const intensity = Math.min(Math.abs(w) / maxAbs, 1);
-      if (w > 0.01) {
-        // green tint — positive contribution
-        const g = Math.round(80 + intensity * 120);
-        s.style.borderColor = `rgba(60,${g},60,${0.4 + intensity * 0.5})`;
-        s.style.color = `rgba(100,${g + 30},100,${0.7 + intensity * 0.3})`;
-      } else if (w < -0.01) {
-        // red tint — negative contribution
-        const r = Math.round(120 + intensity * 100);
-        s.style.borderColor = `rgba(${r},50,50,${0.4 + intensity * 0.5})`;
-        s.style.color = `rgba(${r + 20},80,80,${0.7 + intensity * 0.3})`;
-      }
-      s.title = `${w >= 0 ? '+' : ''}${w.toFixed(3)}`;
-    }
+    s.title = `${w >= 0 ? '+' : ''}${w.toFixed(3)}`;
+
+    // Gray (low importance) → blue (high importance)
+    const intensity = Math.min(abs / maxAbs, 1);
+    // interpolate: gray #aaa → blue #4a90d9
+    const r = Math.round(170 - intensity * 96);   // 170 → 74
+    const g = Math.round(170 - intensity * 26);   // 170 → 144
+    const b = Math.round(170 + intensity * 47);   // 170 → 217
+    const alpha = 0.5 + intensity * 0.5;
+    s.style.color       = `rgba(${r},${g},${b},${alpha})`;
+    s.style.borderColor = `rgba(${r},${g},${b},${alpha * 0.6})`;
+
     container.appendChild(s);
   });
 }
@@ -1381,8 +1408,8 @@ async function handleSwipe(dir) {
   // Track whether the pre-swipe prediction matched the user's choice
   predictionHistory.push((preScore > 0.5) === isLike);
 
-  // RL-specific tracking: reward signal + policy (all vocab weight snapshot)
-  rewardHistory.push(finalReward);
+  // RL-specific tracking: pre-swipe score history + policy weight snapshot
+  if (dir !== 'skip') scoreHistory.push({ type: isLike ? 'like' : 'pass', score: preScore });
   const snap = {};
   getTagWeights().forEach(w => snap[w.tag] = w.weight);
   weightSnapshots.push(snap);
@@ -1562,17 +1589,19 @@ function updateDashboard() {
   );
 
   setupChartHover('reward-chart', 42, 12,
-    () => rewardHistory.length,
+    () => scoreHistory.length,
     idx => {
-      if (!rewardHistory.length) return null;
-      let cum = 0;
-      for (let i = 0; i <= idx; i++) cum += rewardHistory[i];
-      const step = rewardHistory[idx];
-      return [
-        `<span style="color:#666">swipe ${idx + 1} / ${rewardHistory.length}</span>`,
-        `reward: ${step >= 0 ? '+' : ''}${step.toFixed(2)}`,
-        `cumulative: ${cum >= 0 ? '+' : ''}${cum.toFixed(2)}`
-      ];
+      if (!scoreHistory.length) return null;
+      let likeSum = 0, likeN = 0, passSum = 0, passN = 0;
+      for (let i = 0; i <= idx; i++) {
+        const { type, score } = scoreHistory[i];
+        if (type === 'like') { likeSum += score; likeN++; }
+        else                 { passSum += score; passN++; }
+      }
+      const lines = [`<span style="color:#666">swipe ${idx + 1} / ${scoreHistory.length}</span>`];
+      if (likeN > 0) lines.push(`liked avg: ${(likeSum / likeN).toFixed(3)}`);
+      if (passN > 0) lines.push(`disliked avg: ${(passSum / passN).toFixed(3)}`);
+      return lines;
     },
     renderRewardChart
   );
@@ -1805,81 +1834,106 @@ function renderRewardChart() {
   const H = cssH - pad.top  - pad.bottom;
   ctx.clearRect(0, 0, cssW, cssH);
 
-  if (rewardHistory.length < 2) {
+  if (scoreHistory.length < 2) {
     ctx.fillStyle = '#555';
     ctx.font = '11px Inter, system-ui, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('swipe more to see reward curve', pad.left + W / 2, pad.top + H / 2 + 4);
+    ctx.fillText('swipe more to see score trends', pad.left + W / 2, pad.top + H / 2 + 4);
     return;
   }
 
-  // Build cumulative reward series
-  const series = [];
-  let cum = 0;
-  rewardHistory.forEach(r => { cum += r; series.push(cum); });
-  const minV = Math.min(...series, 0);
-  const maxV = Math.max(...series, 0);
-  const range = maxV - minV || 1;
-  const yOf = v => pad.top + H * (1 - (v - minV) / range);
-  const xOf = i => pad.left + (i / (series.length - 1)) * W;
+  const n   = scoreHistory.length;
+  const xOf = i => pad.left + (i / (n - 1)) * W;
 
-  // Y-axis labels + grid at min, 0, max
-  [[minV, '#252525'], [0, '#2e2e2e'], [maxV, '#252525']].forEach(([v, col]) => {
+  // Build running-average series for each type first (need values for y range)
+  const likeAvg = [], passAvg = [];
+  let likeSum = 0, likeN = 0, passSum = 0, passN = 0;
+  scoreHistory.forEach(({ type, score }) => {
+    if (type === 'like') { likeSum += score; likeN++; }
+    else                 { passSum += score; passN++; }
+    likeAvg.push(likeN > 0 ? likeSum / likeN : null);
+    passAvg.push(passN > 0 ? passSum / passN : null);
+  });
+
+  // Zoom y-axis to actual data range with a small margin
+  const allVals = [...likeAvg, ...passAvg].filter(v => v !== null);
+  const rawMin  = Math.min(...allVals);
+  const rawMax  = Math.max(...allVals);
+  const margin  = Math.max((rawMax - rawMin) * 0.15, 0.02);
+  const yMin    = Math.max(0, rawMin - margin);
+  const yMax    = Math.min(1, rawMax + margin);
+  const range   = yMax - yMin || 0.1;
+  const yOf     = v => pad.top + H * (1 - (v - yMin) / range);
+
+  // Y-axis labels + grid at yMin, midpoint, yMax
+  const yMid = (yMin + yMax) / 2;
+  [yMin, yMid, yMax].forEach(v => {
     const y = yOf(v);
     ctx.beginPath();
-    ctx.strokeStyle = col;
-    ctx.lineWidth   = 1;
-    ctx.setLineDash(v === 0 ? [4, 4] : []);
+    ctx.strokeStyle = v === yMid ? '#2e2e2e' : '#252525';
+    ctx.lineWidth = 1;
+    ctx.setLineDash(v === yMid ? [4, 4] : []);
     ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + W, y);
     ctx.stroke();
     ctx.setLineDash([]);
-    const label = (v >= 0 ? '+' : '') + v.toFixed(1);
     ctx.fillStyle = '#aaa';
     ctx.font = '9px Inter, system-ui, sans-serif';
     ctx.textAlign = 'right';
-    ctx.fillText(label, pad.left - 4, y + 3.5);
+    ctx.fillText(v.toFixed(2), pad.left - 4, y + 3.5);
   });
 
-  // Fill under / above zero
-  const y0 = yOf(0);
-  const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + H);
-  grad.addColorStop(0,   'rgba(200,200,200,0.09)');
-  grad.addColorStop(1,   'rgba(200,200,200,0)');
-  ctx.beginPath();
-  ctx.moveTo(xOf(0), y0);
-  series.forEach((v, i) => { ctx.lineTo(xOf(i), yOf(v)); });
-  ctx.lineTo(xOf(series.length - 1), y0);
-  ctx.closePath();
-  ctx.fillStyle = grad;
-  ctx.fill();
+  const drawAvgLine = (avgs, color) => {
+    ctx.beginPath();
+    let started = false;
+    avgs.forEach((v, i) => {
+      if (v === null) return;
+      const x = xOf(i), y = yOf(v);
+      if (!started) { ctx.moveTo(x, y); started = true; }
+      else ctx.lineTo(x, y);
+    });
+    ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.lineJoin = 'round';
+    ctx.stroke();
+    // Terminal dot
+    for (let i = avgs.length - 1; i >= 0; i--) {
+      if (avgs[i] !== null) {
+        ctx.beginPath(); ctx.arc(xOf(i), yOf(avgs[i]), 3, 0, Math.PI * 2);
+        ctx.fillStyle = color; ctx.fill();
+        break;
+      }
+    }
+  };
 
-  // Line
-  ctx.beginPath();
-  series.forEach((v, i) => i === 0 ? ctx.moveTo(xOf(0), yOf(v)) : ctx.lineTo(xOf(i), yOf(v)));
-  ctx.strokeStyle = '#aaa'; ctx.lineWidth = 1.5; ctx.lineJoin = 'round';
-  ctx.stroke();
+  drawAvgLine(passAvg, '#777');
+  drawAvgLine(likeAvg, '#c8c8c8');
 
-  // Terminal dot + label
-  const lx = xOf(series.length - 1), ly = yOf(series[series.length - 1]);
-  ctx.beginPath(); ctx.arc(lx, ly, 3, 0, Math.PI * 2);
-  ctx.fillStyle = '#ccc'; ctx.fill();
-  ctx.fillStyle = '#ccc';
-  ctx.font = '10px Inter, system-ui, sans-serif';
-  ctx.textAlign = lx > pad.left + W - 30 ? 'right' : 'left';
-  ctx.fillText((series[series.length-1] >= 0 ? '+' : '') + series[series.length-1].toFixed(1),
-               lx + (lx > pad.left + W - 30 ? -6 : 6), ly - 5);
+  // Legend (top-right)
+  const legendItems = [['#c8c8c8', 'liked'], ['#777', 'disliked']];
+  legendItems.forEach(([col, label], i) => {
+    const lx = pad.left + W - (i === 0 ? 54 : 114);
+    const ly = pad.top + 8;
+    ctx.beginPath(); ctx.strokeStyle = col; ctx.lineWidth = 1.5;
+    ctx.moveTo(lx, ly); ctx.lineTo(lx + 14, ly); ctx.stroke();
+    ctx.fillStyle = '#888'; ctx.font = '9px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(label, lx + 18, ly + 3);
+  });
 
   // Hover crosshair
   const hIdx = canvas._hoverIdx;
-  if (hIdx != null && hIdx >= 0 && hIdx < series.length) {
-    const cx = xOf(hIdx), cy = yOf(series[hIdx]);
+  if (hIdx != null && hIdx >= 0 && hIdx < n) {
+    const cx = xOf(hIdx);
     ctx.save();
     ctx.beginPath();
     ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 1;
     ctx.moveTo(cx, pad.top); ctx.lineTo(cx, pad.top + H);
     ctx.stroke();
-    ctx.beginPath(); ctx.arc(cx, cy, 3.5, 0, Math.PI * 2);
-    ctx.fillStyle = '#ddd'; ctx.fill();
+    [likeAvg, passAvg].forEach((avgs, s) => {
+      const v = avgs[hIdx];
+      if (v !== null) {
+        ctx.beginPath(); ctx.arc(cx, yOf(v), 3.5, 0, Math.PI * 2);
+        ctx.fillStyle = s === 0 ? '#c8c8c8' : '#777'; ctx.fill();
+      }
+    });
     ctx.restore();
   }
 }
@@ -2114,7 +2168,7 @@ async function saveState() {
       weights,
       trainingSteps, nLiked, nPassed, nSkipped,
       likedScores, passedScores,
-      predictionHistory, rewardHistory, weightSnapshots,
+      predictionHistory, scoreHistory, weightSnapshots,
       tagSampleCounts: { ...tagSampleCounts },
       lastτ,
       likedArtworks,
@@ -2145,7 +2199,7 @@ async function loadState() {
     likedScores        = state.likedScores        || [];
     passedScores       = state.passedScores       || [];
     predictionHistory  = state.predictionHistory  || [];
-    rewardHistory      = state.rewardHistory      || [];
+    scoreHistory      = state.scoreHistory      || [];  // old saves used rewardHistory
     weightSnapshots    = state.weightSnapshots     || [];
     lastτ              = state.lastτ              ?? τ_MAX;
     Object.assign(tagSampleCounts, state.tagSampleCounts || {});
@@ -2364,7 +2418,7 @@ function setupDebugListeners() {
       weights,
       trainingSteps, nLiked, nPassed, nSkipped,
       likedScores, passedScores,
-      predictionHistory, rewardHistory, weightSnapshots,
+      predictionHistory, scoreHistory, weightSnapshots,
       tagSampleCounts: { ...tagSampleCounts },
       lastτ,
       likedArtworks,
@@ -2401,7 +2455,7 @@ function setupDebugListeners() {
       likedScores       = state.likedScores       || [];
       passedScores      = state.passedScores      || [];
       predictionHistory = state.predictionHistory || [];
-      rewardHistory     = state.rewardHistory     || [];
+      scoreHistory     = state.scoreHistory     || [];
       weightSnapshots   = state.weightSnapshots   || [];
       lastτ             = state.lastτ             ?? τ_MAX;
       likedArtworks     = state.likedArtworks     || [];
@@ -2436,7 +2490,7 @@ function setupDebugListeners() {
     // Reset all in-memory state and reinitialise
     trainingSteps = 0; nLiked = 0; nPassed = 0; nSkipped = 0;
     likedScores = []; passedScores = []; likedArtworks = [];
-    predictionHistory = []; rewardHistory = []; weightSnapshots = [];
+    predictionHistory = []; scoreHistory = []; weightSnapshots = [];
     recentStyleWindows = [];
     lastτ = τ_MAX; lastReward = null; lastPenalty = false;
     Object.keys(tagSampleCounts).forEach(k => delete tagSampleCounts[k]);
