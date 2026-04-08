@@ -301,51 +301,32 @@ header {
   50%{opacity:.8;transform:translateY(5px)}
 }
 
-/* ── DEBUG PANEL ── */
-#debug-toggle {
-  position: fixed; bottom: 1.2rem; right: 1.2rem;
-  width: 36px; height: 36px; border-radius: 50%;
-  background: #f0f0f0; border: 1px solid #ddd;
-  cursor: pointer; font-size: 1rem; z-index: 200;
-  display: flex; align-items: center; justify-content: center;
-  color: #888; transition: background 0.15s;
-}
-#debug-toggle:hover { background: #e4e4e4; }
-#debug-toggle.active { background: #1a1a1a; color: #fff; border-color: #1a1a1a; }
-
-#debug-panel {
-  position: fixed; bottom: 3.8rem; right: 1.2rem;
-  background: #fff; border: 1px solid #e2e2e2;
-  border-radius: 10px; padding: 1rem 1.2rem;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
-  z-index: 200; min-width: 200px;
-  display: none; flex-direction: column; gap: 0.7rem;
-}
-#debug-panel.open { display: flex; }
+/* ── DEBUG CONTROLS (inline in dashboard) ── */
 .debug-label {
-  font-size: 0.52rem; letter-spacing: .2em; text-transform: uppercase;
-  color: #888; margin-bottom: 0.2rem;
+  font-size: 0.46rem; letter-spacing: .22em; text-transform: uppercase;
+  color: #666; margin-bottom: 0.4rem; font-family: var(--sans);
 }
 #debug-genre-select {
-  font-size: 0.72rem; padding: 0.35rem 0.5rem;
-  border: 1px solid #e2e2e2; border-radius: 5px;
-  background: #fafafa; color: #1a1a1a; width: 100%;
+  font-size: 0.68rem; padding: 0.3rem 0.5rem;
+  border: 1px solid #333; border-radius: 4px;
+  background: #111; color: #ccc;
 }
 #debug-activate {
-  font-size: 0.65rem; padding: 0.4rem 0.8rem;
-  border: none; border-radius: 5px; cursor: pointer;
-  background: #1a1a1a; color: #fff; letter-spacing: .02em;
+  font-size: 0.62rem; letter-spacing: .04em;
+  padding: 0.25rem 0.65rem;
+  border: 1px solid #555; border-radius: 4px; cursor: pointer;
+  background: transparent; color: #ccc; font-family: var(--sans);
 }
-#debug-activate:hover { opacity: 0.82; }
-#debug-activate.off { background: #e44; }
-
+#debug-activate:hover { color: #fff; border-color: #999; }
+#debug-activate.off { border-color: #e44; color: #e44; }
 #clear-state {
-  font-size: 0.6rem; padding: 0.35rem 0.8rem;
-  border: 1px solid #ddd; border-radius: 5px; cursor: pointer;
-  background: transparent; color: #888; letter-spacing: .02em;
-  margin-top: 0.2rem;
+  font-size: 0.62rem; letter-spacing: .04em;
+  padding: 0.25rem 0.65rem;
+  border: 1px solid #333; border-radius: 4px; cursor: pointer;
+  background: transparent; color: #666; font-family: var(--sans);
 }
 #clear-state:hover { border-color: #e44; color: #e44; }
+.dash-debug { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
 
 .debug-banner {
   position: fixed; top: 49px; left: 0; right: 0;
@@ -623,13 +604,63 @@ kbd {
 <section class="dashboard">
   <div class="dash-inner">
 
-    <div class="dash-io">
+    <div class="dash-debug">
+      <div class="debug-label">Lock to style / genre</div>
+      <select id="debug-genre-select">
+        <optgroup label="Genres">
+          <option value="genre:portrait">Portrait</option>
+          <option value="genre:landscape">Landscape</option>
+          <option value="genre:still-life">Still Life</option>
+          <option value="genre:religious-painting">Religious Painting</option>
+          <option value="genre:genre-painting">Genre Painting</option>
+          <option value="genre:cityscape">Cityscape</option>
+          <option value="genre:nude-painting">Nude Painting</option>
+          <option value="genre:animal-painting">Animal Painting</option>
+          <option value="genre:flower-painting">Flower Painting</option>
+          <option value="genre:history-painting">History Painting</option>
+        </optgroup>
+        <optgroup label="Styles">
+          <option value="style:impressionism">Impressionism</option>
+          <option value="style:post-impressionism">Post-Impressionism</option>
+          <option value="style:surrealism">Surrealism</option>
+          <option value="style:expressionism">Expressionism</option>
+          <option value="style:realism">Realism</option>
+          <option value="style:romanticism">Romanticism</option>
+          <option value="style:baroque">Baroque</option>
+          <option value="style:rococo">Rococo</option>
+          <option value="style:cubism">Cubism</option>
+          <option value="style:symbolism">Symbolism</option>
+          <option value="style:abstract-expressionism">Abstract Expressionism</option>
+          <option value="style:pop-art">Pop Art</option>
+          <option value="style:fauvism">Fauvism</option>
+          <option value="style:art-nouveau-modern">Art Nouveau</option>
+          <option value="style:neoclassicism">Neoclassicism</option>
+          <option value="style:academicism">Academicism</option>
+          <option value="style:high-renaissance">High Renaissance</option>
+          <option value="style:northern-renaissance">Northern Renaissance</option>
+          <option value="style:mannerism-late-renaissance">Mannerism</option>
+          <option value="style:pre-raphaelitism">Pre-Raphaelitism</option>
+          <option value="style:orientalism">Orientalism</option>
+          <option value="style:pointillism">Pointillism</option>
+          <option value="style:minimalism">Minimalism</option>
+          <option value="style:futurism">Futurism</option>
+          <option value="style:dadaism">Dadaism</option>
+          <option value="style:suprematism">Suprematism</option>
+          <option value="style:constructivism">Constructivism</option>
+          <option value="style:photorealism">Photorealism</option>
+          <option value="style:magic-realism">Magic Realism</option>
+          <option value="style:naive-art-primitivism">Naïve Art</option>
+          <option value="style:social-realism">Social Realism</option>
+          <option value="style:color-field-painting">Color Field</option>
+        </optgroup>
+      </select>
+      <button id="debug-activate">Activate</button>
+      <button id="clear-state">Clear saved data</button>
       <button class="hdr-io-btn" id="btn-export" title="Export model &amp; history">Export</button>
       <label class="hdr-io-btn" id="btn-import-label" title="Import model &amp; history">Import<input type="file" id="import-file" accept=".json" style="display:none"></label>
     </div>
 
-    <div class="dash-eyebrow">Neural Network · Interpretability</div>
-    <div class="dash-headline">What the model has learned</div>
+    <div class="dash-headline" style="border-top:1px solid #2a2a2a;padding-top:1.5rem;margin-top:0.5rem">What the model has learned</div>
     <div class="dash-sub">
       Layer-0 weights extracted via <code style="font-size:0.66rem;color:#aaa">model.layers[0].getWeights()[0].dataSync()</code>,
       averaged across 16 hidden units per tag. Updated after every training step.
@@ -834,6 +865,12 @@ function yearToCentury(raw) {
 }
 
 // Convert raw listing row → our artwork object
+const _htmlDecoder = document.createElement('textarea');
+function decodeHtml(str) {
+  _htmlDecoder.innerHTML = str;
+  return _htmlDecoder.value;
+}
+
 function makeArtwork(raw, fallbackStyle) {
   const paintingUrl = raw.paintingUrl || '';
   const artistUrl   = raw.artistUrl   || '';
@@ -843,8 +880,8 @@ function makeArtwork(raw, fallbackStyle) {
   if (century) initTags.push(century);
   return {
     id:            raw.id,
-    title:         raw.title   || 'Untitled',
-    artist:        raw.artistName || 'Unknown',
+    title:         decodeHtml(raw.title   || 'Untitled'),
+    artist:        decodeHtml(raw.artistName || 'Unknown'),
     year:          yearVal,
     imageUrl:      (raw.image  || '').replace('!Large.jpg', '!HalfHD.jpg'),
     sourceUrl:     paintingUrl.startsWith('http') ? paintingUrl : `${WIKIART}${paintingUrl}`,
@@ -1102,10 +1139,21 @@ async function refillDeck() {
       const fresh = (data.Paintings || [])
         .filter(p => p.id && !seenIds.has(p.id))
         .map(p => { seenIds.add(p.id); return makeArtwork(p, style); });
+      // Shuffle each batch before appending — WikiArt pages are artist-sorted
+      for (let i = fresh.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [fresh[i], fresh[j]] = [fresh[j], fresh[i]];
+      }
       deck.push(...fresh);
     } catch (e) {
       console.warn(`refill: ${style} p${page} failed`, e.message);
     }
+  }
+
+  // Shuffle the full unseen tail so styles and artists interleave
+  for (let i = deck.length - 1; i > deckIdx; i--) {
+    const j = deckIdx + Math.floor(Math.random() * (i - deckIdx + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
   }
 
   isRefilling = false;
@@ -1505,7 +1553,7 @@ function updatePred(score) {
     fill.style.width = '0';
     return;
   }
-  el.textContent  = score.toFixed(3);
+  el.textContent  = `${Math.round(score * 100)}%`;
   fill.style.width = `${(score * 100).toFixed(1)}%`;
 }
 
@@ -2309,7 +2357,6 @@ function activateDebug(value) {
 
   document.getElementById('debug-activate').textContent = 'Deactivate';
   document.getElementById('debug-activate').classList.add('off');
-  document.getElementById('debug-toggle').classList.add('active');
 
   const area = document.getElementById('painting-area');
   area.querySelectorAll('.painting-card').forEach(c => c.remove());
@@ -2352,8 +2399,6 @@ function deactivateDebug() {
   if (banner) banner.remove();
   document.getElementById('debug-activate').textContent = 'Activate';
   document.getElementById('debug-activate').classList.remove('off');
-  document.getElementById('debug-toggle').classList.remove('active');
-  document.getElementById('debug-panel').classList.remove('open');
 
   // Clear the debug-only deck and reload with normal mixed content
   deck = [];
@@ -2472,22 +2517,17 @@ function setupDebugListeners() {
     e.target.value = '';
   });
 
-  document.getElementById('debug-toggle').addEventListener('click', () => {
-    document.getElementById('debug-panel').classList.toggle('open');
-  });
   document.getElementById('debug-activate').addEventListener('click', () => {
     if (debugGenre) {
       deactivateDebug();
     } else {
       const value = document.getElementById('debug-genre-select').value;
       activateDebug(value);
-      document.getElementById('debug-panel').classList.remove('open');
     }
   });
   document.getElementById('clear-state').addEventListener('click', () => {
     if (!confirm('Clear all saved model weights and training history?')) return;
     clearState();
-    // Reset all in-memory state and reinitialise
     trainingSteps = 0; nLiked = 0; nPassed = 0; nSkipped = 0;
     likedScores = []; passedScores = []; likedArtworks = [];
     predictionHistory = []; scoreHistory = []; weightSnapshots = [];
@@ -2497,7 +2537,6 @@ function setupDebugListeners() {
     model.setWeights(model.getWeights().map(w => tf.initializers.glorotNormal({}).apply(w.shape)));
     updateDashboard();
     updateHeaderStats();
-    document.getElementById('debug-panel').classList.remove('open');
   });
 }
 
@@ -2510,61 +2549,6 @@ if (document.readyState === 'loading') {
 
 <div id="chart-tooltip"></div>
 
-<!-- Debug panel -->
-<button id="debug-toggle" title="Debug mode">⚙</button>
-<div id="debug-panel">
-  <div class="debug-label">Debug — lock to single tag</div>
-  <select id="debug-genre-select">
-    <optgroup label="Genres">
-      <option value="genre:portrait">Portrait</option>
-      <option value="genre:landscape">Landscape</option>
-      <option value="genre:still-life">Still Life</option>
-      <option value="genre:religious-painting">Religious Painting</option>
-      <option value="genre:genre-painting">Genre Painting</option>
-      <option value="genre:cityscape">Cityscape</option>
-      <option value="genre:nude-painting">Nude Painting</option>
-      <option value="genre:animal-painting">Animal Painting</option>
-      <option value="genre:flower-painting">Flower Painting</option>
-      <option value="genre:history-painting">History Painting</option>
-    </optgroup>
-    <optgroup label="Styles">
-      <option value="style:impressionism">Impressionism</option>
-      <option value="style:post-impressionism">Post-Impressionism</option>
-      <option value="style:surrealism">Surrealism</option>
-      <option value="style:expressionism">Expressionism</option>
-      <option value="style:realism">Realism</option>
-      <option value="style:romanticism">Romanticism</option>
-      <option value="style:baroque">Baroque</option>
-      <option value="style:rococo">Rococo</option>
-      <option value="style:cubism">Cubism</option>
-      <option value="style:symbolism">Symbolism</option>
-      <option value="style:abstract-expressionism">Abstract Expressionism</option>
-      <option value="style:pop-art">Pop Art</option>
-      <option value="style:fauvism">Fauvism</option>
-      <option value="style:art-nouveau-modern">Art Nouveau</option>
-      <option value="style:neoclassicism">Neoclassicism</option>
-      <option value="style:academicism">Academicism</option>
-      <option value="style:high-renaissance">High Renaissance</option>
-      <option value="style:northern-renaissance">Northern Renaissance</option>
-      <option value="style:mannerism-late-renaissance">Mannerism</option>
-      <option value="style:pre-raphaelitism">Pre-Raphaelitism</option>
-      <option value="style:orientalism">Orientalism</option>
-      <option value="style:pointillism">Pointillism</option>
-      <option value="style:minimalism">Minimalism</option>
-      <option value="style:futurism">Futurism</option>
-      <option value="style:dadaism">Dadaism</option>
-      <option value="style:suprematism">Suprematism</option>
-      <option value="style:constructivism">Constructivism</option>
-      <option value="style:photorealism">Photorealism</option>
-      <option value="style:magic-realism">Magic Realism</option>
-      <option value="style:naive-art-primitivism">Naïve Art</option>
-      <option value="style:social-realism">Social Realism</option>
-      <option value="style:color-field-painting">Color Field</option>
-    </optgroup>
-  </select>
-  <button id="debug-activate">Activate</button>
-  <button id="clear-state">Clear saved data</button>
-</div>
 
 </body>
 </html>
